@@ -11,6 +11,7 @@ const nextConfig = {
   swcMinify: true,
   images: {
     domains: ['www.foodstream.in', 'foodstream.in'],
+    unoptimized: true,
   },
   async redirects() {
     return [
