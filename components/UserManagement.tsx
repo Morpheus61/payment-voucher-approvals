@@ -1,106 +1,191 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { sendEmail } from '@/lib/email'
+
+type User = {
+  id: string
+  email: string
+  role: 'super_admin' | 'admin' | 'approver' | 'requester'
+  full_name: string
+  mobile: string
+  created_at: string
+}
+
+type NewUser = Omit<User, 'id' | 'created_at'>
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<any[]>([])
-  const [newUser, setNewUser] = useState({
+  const [users, setUsers] = useState<User[]>([])
+  const [newUser, setNewUser] = useState<NewUser>({
     email: '',
     role: 'requester',
     full_name: '',
     mobile: ''
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const { data } = await supabase
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false })
       
+      if (error) throw error
       setUsers(data || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch users')
     }
-    fetchUsers()
-  }, [])
+  }
 
-  const addUser = async () => {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: newUser.email,
-      password: Math.random().toString(36).slice(-8),
-      user_metadata: {
-        role: newUser.role,
-        full_name: newUser.full_name,
-        mobile: newUser.mobile
-      }
-    })
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
 
-    if (data.user) {
-      setUsers([...users, data.user])
-      setNewUser({ email: '', role: 'requester', full_name: '', mobile: '' })
+    try {
+      // Add user to Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUser.email,
+        password: Math.random().toString(36).slice(-8), // Generate random password
+      })
+
+      if (authError) throw authError
+
+      // Add user details to users table
+      const { error: dbError } = await supabase
+        .from('users')
+        .insert([{
+          ...newUser,
+          id: authData.user?.id,
+        }])
+
+      if (dbError) throw dbError
+
+      // Send welcome email
+      await sendEmail({
+        to: newUser.email,
+        subject: 'Welcome to Payment Voucher Approvals',
+        html: `
+          <h1>Welcome to Payment Voucher Approvals</h1>
+          <p>Your account has been created with the following details:</p>
+          <ul>
+            <li>Role: ${newUser.role}</li>
+            <li>Name: ${newUser.full_name}</li>
+          </ul>
+          <p>Please use the password reset link in your email to set your password.</p>
+        `
+      })
+
+      // Reset form and refresh users
+      setNewUser({
+        email: '',
+        role: 'requester',
+        full_name: '',
+        mobile: ''
+      })
+      fetchUsers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add user')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white p-4 rounded shadow">
-        <h3 className="text-lg font-bold mb-4">Add New User</h3>
-        <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-8">
+      {/* Add User Form */}
+      <form onSubmit={handleAddUser} className="space-y-4 p-4 bg-white rounded-lg shadow">
+        <h2 className="text-xl font-semibold">Add New User</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             type="email"
             placeholder="Email"
             value={newUser.email}
-            onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+            onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
             className="p-2 border rounded"
+            required
           />
-          <select
-            value={newUser.role}
-            onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-            className="p-2 border rounded"
-          >
-            <option value="requester">Requester</option>
-            <option value="approver">Approver</option>
-            <option value="admin">Admin</option>
-          </select>
+          
           <input
             type="text"
             placeholder="Full Name"
             value={newUser.full_name}
-            onChange={(e) => setNewUser({...newUser, full_name: e.target.value})}
+            onChange={(e) => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
             className="p-2 border rounded"
+            required
           />
+          
           <input
             type="tel"
-            placeholder="Mobile Number"
+            placeholder="Mobile"
             value={newUser.mobile}
-            onChange={(e) => setNewUser({...newUser, mobile: e.target.value})}
+            onChange={(e) => setNewUser(prev => ({ ...prev, mobile: e.target.value }))}
             className="p-2 border rounded"
+            required
           />
-          <button
-            onClick={addUser}
-            className="col-span-2 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+          
+          <select
+            value={newUser.role}
+            onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as User['role'] }))}
+            className="p-2 border rounded"
+            required
           >
-            Create User
-          </button>
+            <option value="requester">Requester</option>
+            <option value="approver">Approver</option>
+            <option value="admin">Admin</option>
+            <option value="super_admin">Super Admin</option>
+          </select>
         </div>
-      </div>
 
-      <div className="bg-white rounded shadow overflow-hidden">
-        <table className="w-full">
+        {error && <p className="text-red-500">{error}</p>}
+        
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+        >
+          {loading ? 'Adding...' : 'Add User'}
+        </button>
+      </form>
+
+      {/* Users List */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white rounded-lg shadow">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-2 text-left">Name</th>
-              <th className="px-4 py-2 text-left">Email</th>
-              <th className="px-4 py-2 text-left">Role</th>
-              <th className="px-4 py-2 text-left">Mobile</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
             </tr>
           </thead>
-          <tbody>
-            {users.map(user => (
-              <tr key={user.id} className="border-t">
-                <td className="px-4 py-2">{user.full_name}</td>
-                <td className="px-4 py-2">{user.email}</td>
-                <td className="px-4 py-2 capitalize">{user.role}</td>
-                <td className="px-4 py-2">{user.mobile}</td>
+          <tbody className="divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-6 py-4 whitespace-nowrap">{user.full_name}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded text-xs ${
+                    user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                    user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                    user.role === 'approver' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">{user.mobile}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {new Date(user.created_at).toLocaleDateString()}
+                </td>
               </tr>
             ))}
           </tbody>
