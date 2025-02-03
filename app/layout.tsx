@@ -6,12 +6,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'Payment Voucher Approvals',
-  description: 'Streamline your payment voucher approval process',
-  icons: {
-    icon: '/icons/Relish Logo with Plate (4).png',
-    shortcut: '/icons/Relish Logo with Plate (4).png',
-    apple: '/icons/Relish Logo with Plate (4).png',
-  }
+  description: 'Streamline your payment voucher approval process'
 }
 
 export default function RootLayout({

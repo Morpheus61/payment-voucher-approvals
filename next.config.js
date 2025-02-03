@@ -9,6 +9,24 @@ const withPWA = require('next-pwa')({
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  images: {
+    domains: ['www.foodstream.in', 'foodstream.in'],
+  },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        has: [
+          {
+            type: 'host',
+            value: 'payment-voucher-approvals.vercel.app',
+          },
+        ],
+        destination: 'https://www.foodstream.in',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = withPWA(nextConfig)
