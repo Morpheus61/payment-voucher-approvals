@@ -19,21 +19,29 @@ export default function LoginForm() {
     setError(null)
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
       })
 
       if (signInError) {
+        console.error('Sign in error:', signInError)
         throw signInError
       }
 
-      // Successful login - redirect to admin page
+      if (!data?.user) {
+        throw new Error('No user data returned')
+      }
+
+      // Successful login
+      console.log('Login successful:', data.user.id)
       router.push('/admin')
+      router.refresh()
       
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign in')
+    } finally {
       setLoading(false)
     }
   }
