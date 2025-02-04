@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginForm() {
@@ -10,8 +10,6 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/admin'
 
   useEffect(() => {
     const checkSession = async () => {
@@ -22,7 +20,7 @@ export default function LoginForm() {
           return
         }
         if (session?.user) {
-          router.push(redirectTo)
+          router.push('/admin')
         }
       } catch (err) {
         console.error('Session check error:', err)
@@ -33,7 +31,7 @@ export default function LoginForm() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        router.push(redirectTo)
+        router.push('/admin')
       }
     })
 
@@ -42,7 +40,7 @@ export default function LoginForm() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [router, redirectTo])
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,7 +61,7 @@ export default function LoginForm() {
         throw new Error('No user data returned')
       }
 
-      router.push(redirectTo)
+      router.push('/admin')
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign in')
