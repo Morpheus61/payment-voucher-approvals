@@ -10,10 +10,16 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // If user is not signed in and trying to access protected routes, redirect to login
-  if (!session && !req.nextUrl.pathname.startsWith('/_next')) {
-    const redirectUrl = req.nextUrl.pathname
-    return NextResponse.redirect(new URL(`/?redirectTo=${redirectUrl}`, req.url))
+  // Allow public access to the root path and static assets
+  if (req.nextUrl.pathname === '/' || 
+      req.nextUrl.pathname.startsWith('/_next') || 
+      req.nextUrl.pathname.startsWith('/icons')) {
+    return res
+  }
+
+  // If no session, redirect to root
+  if (!session) {
+    return NextResponse.redirect(new URL('/', req.url))
   }
 
   return res
@@ -21,6 +27,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }

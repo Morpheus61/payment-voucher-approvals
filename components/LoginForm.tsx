@@ -51,7 +51,7 @@ export default function LoginForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <img
-            src="/icons/Relish Logo with Plate (4).png"
+            src="Relish Logo with Plate (4).png"
             alt="Relish Logo"
             className="mx-auto h-24 w-auto"
           />
