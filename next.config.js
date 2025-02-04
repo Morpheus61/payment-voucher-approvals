@@ -2,13 +2,27 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
-  disable: false // Enable PWA in all environments
+  disable: false
 })
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'standalone',
+  compress: true,
+  productionBrowserSourceMaps: false,
+  publicRuntimeConfig: {
+    baseUrl: 'https://www.foodstream.in'
+  },
+  env: {
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+  },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['www.foodstream.in'],
+    },
+  },
   async headers() {
     return [
       {
@@ -66,9 +80,7 @@ const nextConfig = {
     ]
   },
   // Production optimizations
-  productionBrowserSourceMaps: false, // Disable source maps in production
   poweredByHeader: false, // Remove X-Powered-By header
-  compress: true, // Enable gzip compression
   generateEtags: true, // Enable ETag generation
   images: {
     domains: ['www.foodstream.in'], // Add allowed image domains
