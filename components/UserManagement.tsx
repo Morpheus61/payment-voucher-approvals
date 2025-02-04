@@ -168,115 +168,175 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-8">
-      {/* Add User Form */}
-      <form onSubmit={handleAddUser} className="space-y-4 p-4 bg-white rounded-lg shadow">
-        <h2 className="text-xl font-semibold">Add New User</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            type="email"
-            placeholder="Email"
-            value={newUser.email}
-            onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-            className="p-2 border rounded"
-            required
-          />
-          
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={newUser.full_name}
-            onChange={(e) => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
-            className="p-2 border rounded"
-            required
-          />
-          
-          <input
-            type="tel"
-            placeholder="Mobile"
-            value={newUser.mobile}
-            onChange={(e) => setNewUser(prev => ({ ...prev, mobile: e.target.value }))}
-            className="p-2 border rounded"
-            required
-          />
-          
-          <select
-            value={newUser.role}
-            onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as User['role'] }))}
-            className="p-2 border rounded"
-            required
-          >
-            <option value="requester">Requester</option>
-            <option value="approver">Approver</option>
-            <option value="admin">Admin</option>
-            <option value="super_admin">Super Admin</option>
-          </select>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-gray-500">Total Users</h3>
+          <p className="text-2xl font-semibold text-gray-900">{users.length}</p>
         </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-gray-500">Approvers</h3>
+          <p className="text-2xl font-semibold text-green-600">
+            {users.filter(u => u.role === 'approver').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-gray-500">Requesters</h3>
+          <p className="text-2xl font-semibold text-blue-600">
+            {users.filter(u => u.role === 'requester').length}
+          </p>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm font-medium text-gray-500">Admins</h3>
+          <p className="text-2xl font-semibold text-purple-600">
+            {users.filter(u => u.role === 'admin' || u.role === 'super_admin').length}
+          </p>
+        </div>
+      </div>
 
-        {error && <p className="text-red-500">{error}</p>}
+      {/* Add User Form */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">Add New User</h2>
+          <p className="text-sm text-gray-500">Create a new user account</p>
+        </div>
         
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-        >
-          {loading ? 'Adding...' : 'Add User'}
-        </button>
-      </form>
+        <form onSubmit={handleAddUser} className="p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <input
+                type="email"
+                placeholder="user@example.com"
+                value={newUser.email}
+                onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                className="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={newUser.full_name}
+                onChange={(e) => setNewUser(prev => ({ ...prev, full_name: e.target.value }))}
+                className="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Mobile</label>
+              <input
+                type="tel"
+                placeholder="+1234567890"
+                value={newUser.mobile}
+                onChange={(e) => setNewUser(prev => ({ ...prev, mobile: e.target.value }))}
+                className="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Role</label>
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as User['role'] }))}
+                className="mt-1 p-2 w-full border rounded focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="requester">Requester</option>
+                <option value="approver">Approver</option>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              {loading ? 'Adding...' : 'Add User'}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* Users List */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full bg-white rounded-lg shadow">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mobile</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap">{user.full_name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
-                    user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                    user.role === 'approver' ? 'bg-green-100 text-green-800' :
-                    'bg-gray-100 text-gray-800'
-                  }`}>
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">{user.mobile}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {new Date(user.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap space-x-2">
-                  <button
-                    onClick={() => {
-                      setEditingUser(user);
-                      setIsEditModalOpen(true);
-                    }}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
-                </td>
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">Active Users</h2>
+          <p className="text-sm text-gray-500">Manage and view all active users</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{user.email}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                      user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                      user.role === 'approver' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{user.mobile}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <button
+                      onClick={() => {
+                        setEditingUser(user);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Edit Modal */}
