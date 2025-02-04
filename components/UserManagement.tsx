@@ -27,23 +27,81 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      setError(null);
+
+      // First, get the current user's session to ensure we're authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw sessionError;
+      }
+
+      if (!session) {
+        console.error('No active session');
+        throw new Error('No active session found');
+      }
+
+      // Get all users from the users table
+      const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
-        .order('created_at', { ascending: false })
-      
-      if (error) throw error
-      setUsers(data || [])
+        .order('created_at', { ascending: false });
+
+      console.log('Users query response:', { usersData, usersError }); // Debug log
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        throw usersError;
+      }
+
+      if (!usersData) {
+        console.error('No users data received');
+        throw new Error('No users data received');
+      }
+
+      // Set the users in state
+      setUsers(usersData);
+      console.log('Users set in state:', usersData); // Debug log
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      console.error('Error in fetchUsers:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    console.log('Component mounted, fetching users...'); // Debug log
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    console.log('Setting up realtime subscription...'); // Debug log
+    const usersSubscription = supabase
+      .channel('users_channel')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'users' 
+        }, 
+        (payload) => {
+          console.log('Realtime update received:', payload); // Debug log
+          fetchUsers();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log('Cleaning up subscription...'); // Debug log
+      usersSubscription.unsubscribe();
+    };
+  }, []);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,25 +109,41 @@ export default function UserManagement() {
     setError(null);
 
     try {
+      // First, get the current user's session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw new Error(sessionError.message);
+      if (!session) throw new Error('No active session found');
+
       // Add user to Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: Math.random().toString(36).slice(-8), // Generate random password
+        email_confirm: true
       });
 
       if (authError) throw new Error(authError.message);
 
-      // Add user details to users table
+      // Add user details to users table using service role client
       const { data: userData, error: dbError } = await supabase
         .from('users')
         .insert([{
-          ...newUser,
           id: authData.user?.id,
+          email: newUser.email,
+          full_name: newUser.full_name,
+          mobile: newUser.mobile,
+          role: newUser.role
         }])
         .select()
         .single();
 
-      if (dbError) throw new Error(dbError.message);
+      if (dbError) {
+        // If there's a database error, try to clean up the auth user
+        if (authData.user?.id) {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        }
+        throw new Error(dbError.message);
+      }
 
       // Send welcome email
       const emailResult = await sendEmail({
@@ -102,7 +176,8 @@ export default function UserManagement() {
         mobile: ''
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add user');
+      console.error('Error adding user:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add user. Please make sure you have admin privileges.');
     } finally {
       setLoading(false);
     }
@@ -277,65 +352,83 @@ export default function UserManagement() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                      user.role === 'approver' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.mobile}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button
-                      onClick={() => {
-                        setEditingUser(user);
-                        setIsEditModalOpen(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </td>
+          {error && (
+            <div className="p-4 text-red-500 bg-red-50 border-l-4 border-red-500">
+              <p className="font-medium">Error loading users</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p>Loading users...</p>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <p>No users found</p>
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{user.full_name || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{user.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                        user.role === 'approver' ? 'bg-green-100 text-green-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{user.mobile || '-'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button
+                        onClick={() => {
+                          setEditingUser(user);
+                          setIsEditModalOpen(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900 mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
