@@ -9,6 +9,27 @@ const withPWA = require('next-pwa')({
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: 'https://www.foodstream.in'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+          }
+        ]
+      }
+    ]
+  },
   async redirects() {
     return [
       {
@@ -23,7 +44,7 @@ const nextConfig = {
         permanent: true,
       },
     ]
-  },
+  }
 }
 
 module.exports = withPWA(nextConfig)

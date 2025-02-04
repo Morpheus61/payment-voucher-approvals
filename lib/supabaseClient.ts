@@ -7,7 +7,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
     flowType: 'pkce',
     storage: {
       getItem: (key) => {
@@ -26,6 +26,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
           window.localStorage.removeItem(key)
         }
       }
+    }
+  },
+  global: {
+    headers: {
+      'X-Supabase-Api-Version': '2024-01-01'
     }
   }
 })
