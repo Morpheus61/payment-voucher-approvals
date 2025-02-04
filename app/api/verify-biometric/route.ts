@@ -68,7 +68,13 @@ export async function POST(req: Request) {
     const { data: refreshedSession } = await supabase.auth.refreshSession()
     if (!refreshedSession?.user) throw new Error('Session refresh failed')
 
-    // Set secure HTTP-only cookie
+    if (!refreshedSession?.session) {
+      return NextResponse.json(
+        { error: 'Session refresh failed' },
+        { status: 401 }
+      );
+    }
+
     const cookie = `sb-access-token=${refreshedSession.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`;
     return new NextResponse(JSON.stringify({ success: true }), {
       status: 200,

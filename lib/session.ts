@@ -1,17 +1,33 @@
-import { createClient } from '@supabase/supabase-js'
+// lib/session.ts
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import type { User } from '@supabase/supabase-js'
 
-export const getSession = async (): Promise<{ user: any } | null> => {
-  const supabase = createClient(
+interface SessionData {
+  user: User | null
+}
+
+export async function getSession(): Promise<SessionData | null> {
+  const cookieStore = cookies()
+  
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
+    process.env.SUPABASE_SERVICE_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options) {
+          cookieStore.delete({ name, ...options })
+        }
+      }
+    }
   )
 
-  const cookieStore = cookies()
-  const accessToken = cookieStore.get('sb-access-token')?.value
-  
-  if (!accessToken) return null
-  
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken)
-  return error ? null : user
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user ? { user: session.user } : null
 }
