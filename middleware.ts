@@ -6,18 +6,18 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Refresh session if expired
+  const { data: { session } } = await supabase.auth.getSession()
 
-  // Allow public access to the root path and static assets
-  if (req.nextUrl.pathname === '/' || 
-      req.nextUrl.pathname.startsWith('/_next') || 
-      req.nextUrl.pathname.startsWith('/icons')) {
+  // Public paths that don't require authentication
+  const publicPaths = ['/', '/icons', '/_next', '/api']
+  const isPublicPath = publicPaths.some(path => req.nextUrl.pathname.startsWith(path))
+
+  if (isPublicPath) {
     return res
   }
 
-  // If no session, redirect to root
+  // Protected routes
   if (!session) {
     return NextResponse.redirect(new URL('/', req.url))
   }
@@ -27,6 +27,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }
