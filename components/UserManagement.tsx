@@ -163,6 +163,7 @@ export default function UserManagement() {
     setError(null)
 
     try {
+      // First update the users table
       const { error: dbError } = await supabase
         .from('users')
         .update({
@@ -175,9 +176,23 @@ export default function UserManagement() {
 
       if (dbError) throw new Error(dbError.message)
 
+      // Update local state to reflect changes immediately
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === editingUser.id 
+            ? {
+                ...user,
+                full_name: editingUser.full_name,
+                mobile: editingUser.mobile,
+                role: editingUser.role,
+                updated_at: new Date().toISOString()
+              }
+            : user
+        )
+      )
+
       setIsEditModalOpen(false)
       setEditingUser(null)
-      // Removed fetchUsers() call since realtime subscription will handle the update
     } catch (err) {
       console.error('Error updating user:', err)
       setError(err instanceof Error ? err.message : 'Failed to update user')
