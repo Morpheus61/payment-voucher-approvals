@@ -65,7 +65,7 @@ export function BiometricAuth() {
         .from('user_credentials')
         .insert({
           user_id: user.id,
-          credential_id: btoa(String.fromCharCode(...new Uint8Array((credential as PublicKeyCredential).rawId))),
+          credential_id: btoa(Array.from(new Uint8Array((credential as PublicKeyCredential).rawId), c => String.fromCharCode(c)).join('')),
           public_key: JSON.stringify(credential),
           created_at: new Date().toISOString()
         })
