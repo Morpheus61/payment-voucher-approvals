@@ -21,8 +21,23 @@ export async function middleware(req: NextRequest) {
 
   // If there's no session and trying to access protected route, redirect to login
   if (!session) {
-    const redirectUrl = new URL('/', req.url)
+    const redirectUrl = new URL('/login', req.url)
     return NextResponse.redirect(redirectUrl)
+  }
+
+  // For admin routes, check if user has admin role
+  if (req.nextUrl.pathname.startsWith('/admin')) {
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+
+    if (!userData || !['admin', 'super_admin'].includes(userData.role)) {
+      // Redirect non-admin users to home
+      const redirectUrl = new URL('/', req.url)
+      return NextResponse.redirect(redirectUrl)
+    }
   }
 
   return res

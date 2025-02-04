@@ -58,12 +58,14 @@ export default function UserManagement() {
       if (authError) throw new Error(authError.message);
 
       // Add user details to users table
-      const { error: dbError } = await supabase
+      const { data: userData, error: dbError } = await supabase
         .from('users')
         .insert([{
           ...newUser,
           id: authData.user?.id,
-        }]);
+        }])
+        .select()
+        .single();
 
       if (dbError) throw new Error(dbError.message);
 
@@ -84,18 +86,19 @@ export default function UserManagement() {
 
       if (!emailResult.success) {
         console.warn('Failed to send welcome email:', emailResult.error);
-        // Don't throw error, just show warning since user is already created
         setError('User created successfully but failed to send welcome email. Please check your email configuration.');
       }
 
-      // Reset form and refresh users list
+      // Update users state directly instead of fetching
+      setUsers(prevUsers => [userData, ...prevUsers]);
+
+      // Reset form
       setNewUser({
         email: '',
         role: 'requester',
         full_name: '',
         mobile: ''
       });
-      fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add user');
     } finally {
