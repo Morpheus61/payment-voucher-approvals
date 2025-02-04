@@ -1,4 +1,16 @@
-import { supabase } from './supabaseClient'
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize Supabase client only when needed
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Database configuration is missing')
+  }
+
+  return createClient(supabaseUrl, supabaseKey)
+}
 
 export async function requestNotificationPermission() {
   if (!('Notification' in window)) {
@@ -25,17 +37,27 @@ export async function subscribeToPushNotifications() {
       applicationServerKey: vapidPublicKey
     })
 
-    // Store the subscription in Supabase
-    const { error } = await supabase
-      .from('push_subscriptions')
-      .upsert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        subscription: JSON.stringify(subscription),
-        updated_at: new Date().toISOString()
-      })
+    try {
+      // Get Supabase client
+      const supabase = getSupabaseClient()
 
-    if (error) throw error
-    return true
+      // Store the subscription in Supabase
+      const { error } = await supabase
+        .from('push_subscriptions')
+        .upsert({
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          subscription: JSON.stringify(subscription),
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) throw error
+      return true
+    } catch (dbError) {
+      console.error('Error storing push subscription:', dbError)
+      // Clean up the push subscription since we couldn't store it
+      await subscription.unsubscribe()
+      return false
+    }
   } catch (error) {
     console.error('Error subscribing to push notifications:', error)
     return false
