@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginForm() {
@@ -10,20 +10,39 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo') || '/admin'
 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('Session check error:', sessionError)
+          return
+        }
         if (session?.user) {
-          router.push('/admin')
+          router.push(redirectTo)
         }
       } catch (err) {
         console.error('Session check error:', err)
       }
     }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.push(redirectTo)
+      }
+    })
+
     checkSession()
-  }, [router])
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [router, redirectTo])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +63,7 @@ export default function LoginForm() {
         throw new Error('No user data returned')
       }
 
-      router.push('/admin')
-      
+      router.push(redirectTo)
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Failed to sign in')
@@ -58,7 +76,7 @@ export default function LoginForm() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <img
-            src="Relish Logo with Plate (4).png"
+            src="/Relish Logo with Plate (4).png"
             alt="Relish Logo"
             className="mx-auto h-24 w-auto"
           />
