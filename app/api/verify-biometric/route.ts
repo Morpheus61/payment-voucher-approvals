@@ -37,12 +37,24 @@ export async function POST(req: Request) {
       throw new Error('Invalid assertion')
     }
 
-    // Create a new session for the user
-    const { data: session, error: sessionError } = await supabase.auth.admin.createSession({
-      user_id: credential.user_id
+    // Get the user's email to create a new session
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', credential.user_id)
+      .single()
+
+    if (userError) throw userError
+    if (!userData?.email) throw new Error('User email not found')
+
+    // Create a new session by signing in the user
+    const { data: session, error: signInError } = await supabase.auth.signInWithPassword({
+      email: userData.email,
+      // Use a temporary password that will be immediately invalidated
+      password: Math.random().toString(36).slice(-8)
     })
 
-    if (sessionError) throw sessionError
+    if (signInError) throw signInError
 
     return NextResponse.json({ 
       message: 'Biometric verification successful',
