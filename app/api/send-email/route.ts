@@ -1,17 +1,33 @@
 import { Resend } from 'resend'
 import { NextResponse } from 'next/server'
 
+// Validate environment variables
 const resendApiKey = process.env.RESEND_API_KEY
+const fromEmail = process.env.RESEND_FROM_EMAIL || 'compliance@foodstream.in'
+
 if (!resendApiKey) {
-  throw new Error('RESEND_API_KEY is not set in environment variables')
+  console.error('RESEND_API_KEY is not set in environment variables')
 }
 
-const resend = new Resend(resendApiKey)
-const fromEmail = process.env.RESEND_FROM_EMAIL || 'no-reply@foodstream.in'
+// Initialize Resend only if we have an API key
+const resend = resendApiKey ? new Resend(resendApiKey) : null
 
 export async function POST(req: Request) {
   try {
+    // Check if Resend is initialized
+    if (!resend) {
+      throw new Error('Email service is not configured properly')
+    }
+
     const { to, subject, html } = await req.json()
+
+    // Validate required fields
+    if (!to || !subject || !html) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
 
     const data = await resend.emails.send({
       from: fromEmail,
@@ -23,6 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error sending email:', error)
-    return NextResponse.json({ error: 'Failed to send email' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to send email'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
