@@ -30,53 +30,48 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
 
-      // Get all users from the users table with proper ordering and role filter
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      console.log('Users query response:', { usersData, usersError }); // Debug log
-
-      if (usersError) {
-        console.error('Error fetching users:', usersError);
-        throw usersError;
+      const response = await fetch('/api/users')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch users')
       }
+
+      const { users: usersData } = await response.json()
+      console.log('Users data from API:', usersData)
 
       if (!usersData) {
-        console.error('No users data received');
-        throw new Error('No users data received');
+        throw new Error('No users data received')
       }
 
-      // Ensure all required fields are present
-      const processedUsers = usersData.map(user => ({
-        ...user,
+      // Process and validate each user's data
+      const processedUsers = usersData.map((user: any) => ({
+        id: user.id,
+        email: user.email,
         full_name: user.full_name || '',
         mobile: user.mobile || '',
-        role: user.role || 'requester' // Default to requester if role is somehow null
-      }));
+        role: user.role,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      }))
 
-      // Set the users in state
-      setUsers(processedUsers);
-      console.log('Processed users set in state:', processedUsers); // Debug log
+      setUsers(processedUsers)
     } catch (err) {
-      console.error('Error in fetchUsers:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+      console.error('Error in fetchUsers:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch users')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    console.log('Component mounted, fetching users...'); // Debug log
-    fetchUsers();
-  }, []);
+    fetchUsers()
+  }, [])
 
+  // Add realtime subscription for updates
   useEffect(() => {
-    console.log('Setting up realtime subscription...'); // Debug log
     const usersSubscription = supabase
       .channel('users_channel')
       .on('postgres_changes', 
@@ -85,43 +80,35 @@ export default function UserManagement() {
           schema: 'public', 
           table: 'users' 
         }, 
-        (payload) => {
-          console.log('Realtime update received:', payload); // Debug log
-          fetchUsers();
+        () => {
+          console.log('Database changed, fetching fresh data')
+          fetchUsers()
         }
       )
-      .subscribe();
+      .subscribe()
 
-    // Cleanup subscription on unmount
     return () => {
-      console.log('Cleaning up subscription...'); // Debug log
-      usersSubscription.unsubscribe();
-    };
-  }, []);
+      usersSubscription.unsubscribe()
+    }
+  }, [])
 
   const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
 
     try {
-      // First, get the current user's session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) throw new Error(sessionError.message);
-      if (!session) throw new Error('No active session found');
-
       // Add user to Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: newUser.email,
-        password: Math.random().toString(36).slice(-8), // Generate random password
+        password: Math.random().toString(36).slice(-8),
         email_confirm: true
-      });
+      })
 
-      if (authError) throw new Error(authError.message);
+      if (authError) throw new Error(authError.message)
 
-      // Add user details to users table using service role client
-      const { data: userData, error: dbError } = await supabase
+      // Add user details to users table
+      const { error: dbError } = await supabase
         .from('users')
         .insert([{
           id: authData.user?.id,
@@ -130,19 +117,16 @@ export default function UserManagement() {
           mobile: newUser.mobile,
           role: newUser.role
         }])
-        .select()
-        .single();
 
       if (dbError) {
-        // If there's a database error, try to clean up the auth user
         if (authData.user?.id) {
-          await supabase.auth.admin.deleteUser(authData.user.id);
+          await supabase.auth.admin.deleteUser(authData.user.id)
         }
-        throw new Error(dbError.message);
+        throw new Error(dbError.message)
       }
 
       // Send welcome email
-      const emailResult = await sendEmail({
+      await sendEmail({
         to: newUser.email,
         subject: 'Welcome to Payment Voucher Approvals',
         html: `
@@ -154,40 +138,32 @@ export default function UserManagement() {
           </ul>
           <p>Please use the password reset link in your email to set your password.</p>
         `
-      });
+      })
 
-      if (!emailResult.success) {
-        console.warn('Failed to send welcome email:', emailResult.error);
-        setError('User created successfully but failed to send welcome email. Please check your email configuration.');
-      }
-
-      // Update users state
-      setUsers(prevUsers => [userData, ...prevUsers]);
-
-      // Reset form
+      // Reset form and refresh users list
       setNewUser({
         email: '',
         role: 'requester',
         full_name: '',
         mobile: ''
-      });
+      })
+      fetchUsers()
     } catch (err) {
-      console.error('Error adding user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to add user. Please make sure you have admin privileges.');
+      console.error('Error adding user:', err)
+      setError(err instanceof Error ? err.message : 'Failed to add user')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   const handleEditUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
+    e.preventDefault()
+    if (!editingUser) return
     
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
-      // Update the user in the database
       const { error: dbError } = await supabase
         .from('users')
         .update({
@@ -196,64 +172,93 @@ export default function UserManagement() {
           role: editingUser.role,
           updated_at: new Date().toISOString()
         })
-        .eq('id', editingUser.id);
-
-      if (dbError) {
-        console.error('Error updating user:', dbError);
-        throw new Error(dbError.message);
-      }
-
-      // Fetch the updated user to ensure we have the latest data
-      const { data: updatedUser, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
         .eq('id', editingUser.id)
-        .single();
 
-      if (fetchError) {
-        console.error('Error fetching updated user:', fetchError);
-        throw new Error(fetchError.message);
-      }
+      if (dbError) throw new Error(dbError.message)
 
-      // Update users state with the fresh data
-      setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === editingUser.id ? updatedUser : user
-        )
-      );
-
-      setIsEditModalOpen(false);
-      setEditingUser(null);
+      setIsEditModalOpen(false)
+      setEditingUser(null)
+      fetchUsers()
     } catch (err) {
-      console.error('Error in handleEditUser:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      console.error('Error updating user:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update user')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm('Are you sure you want to delete this user?')) return
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
       const { error: dbError } = await supabase
         .from('users')
         .delete()
-        .eq('id', userId);
+        .eq('id', userId)
 
-      if (dbError) throw new Error(dbError.message);
+      if (dbError) throw new Error(dbError.message)
 
-      // Update users state
-      setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      fetchUsers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      console.error('Error deleting user:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete user')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
+
+  const renderUserRow = (user: User) => (
+    <tr key={user.id} className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-medium text-gray-900">
+          {user.full_name ? user.full_name : '-'}
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm text-gray-900">{user.email}</div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+          user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+          user.role === 'approver' ? 'bg-green-100 text-green-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {user.role}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm text-gray-900">
+          {user.mobile ? user.mobile : '-'}
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm text-gray-500">
+          {new Date(user.created_at).toLocaleDateString()}
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <button
+          onClick={() => {
+            setEditingUser(user);
+            setIsEditModalOpen(true);
+          }}
+          className="text-blue-600 hover:text-blue-900 mr-4"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => handleDeleteUser(user.id)}
+          className="text-red-600 hover:text-red-900"
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+  );
 
   return (
     <div className="space-y-8">
@@ -395,51 +400,7 @@ export default function UserManagement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{user.full_name || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
-                        user.role === 'approver' ? 'bg-green-100 text-green-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{user.mobile || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button
-                        onClick={() => {
-                          setEditingUser(user);
-                          setIsEditModalOpen(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {users.map(renderUserRow)}
               </tbody>
             </table>
           )}
