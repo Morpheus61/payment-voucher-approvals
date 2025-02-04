@@ -1,13 +1,8 @@
-'use client'
+'use server'
 
 import './globals.css'
 import { Inter } from 'next/font/google'
-import { AuthProvider } from '@/components/AuthProvider'
-import InstallPrompt from '@/components/InstallPrompt'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { getCookie } from 'cookies-next'
-import { supabase } from '@/lib/auth'
+import ClientLayout from '@/components/ClientLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -15,22 +10,8 @@ export const metadata = {
   title: 'Relish Approvals',
   description: 'Manage and approve payment vouchers for Relish Hao Hao Chi Foods',
   manifest: '/manifest.json',
-  themeColor: '#3b82f6',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Relish Approvals',
-  },
-  formatDetection: {
-    telephone: false,
-  },
+  themeColor: '#ffffff',
+  viewport: 'minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, viewport-fit=cover'
 }
 
 export default function RootLayout({
@@ -38,29 +19,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const currentToken = getCookie('sb-access-token')
-      
-      if (session?.access_token !== currentToken) {
-        if (session) {
-          document.cookie = `sb-access-token=${session.access_token}; path=/; secure; samesite=strict; max-age=604800`
-        }
-        router.refresh()
-      }
-    })
-    return () => subscription?.unsubscribe()
-  }, [router])
-
   return (
     <html lang="en" className={inter.className}>
       <body>
-        <AuthProvider>
-          <InstallPrompt />
+        <ClientLayout>
           {children}
-        </AuthProvider>
+        </ClientLayout>
       </body>
     </html>
   )
