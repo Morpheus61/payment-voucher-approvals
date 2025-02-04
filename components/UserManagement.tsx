@@ -10,9 +10,10 @@ type User = {
   full_name: string
   mobile: string
   created_at: string
+  updated_at: string
 }
 
-type NewUser = Omit<User, 'id' | 'created_at'>
+type NewUser = Omit<User, 'id' | 'created_at' | 'updated_at'>
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
@@ -32,20 +33,7 @@ export default function UserManagement() {
       setLoading(true);
       setError(null);
 
-      // First, get the current user's session to ensure we're authenticated
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('Session error:', sessionError);
-        throw sessionError;
-      }
-
-      if (!session) {
-        console.error('No active session');
-        throw new Error('No active session found');
-      }
-
-      // Get all users from the users table
+      // Get all users from the users table with proper ordering and role filter
       const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
@@ -63,9 +51,17 @@ export default function UserManagement() {
         throw new Error('No users data received');
       }
 
+      // Ensure all required fields are present
+      const processedUsers = usersData.map(user => ({
+        ...user,
+        full_name: user.full_name || '',
+        mobile: user.mobile || '',
+        role: user.role || 'requester' // Default to requester if role is somehow null
+      }));
+
       // Set the users in state
-      setUsers(usersData);
-      console.log('Users set in state:', usersData); // Debug log
+      setUsers(processedUsers);
+      console.log('Processed users set in state:', processedUsers); // Debug log
     } catch (err) {
       console.error('Error in fetchUsers:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch users');
@@ -191,27 +187,45 @@ export default function UserManagement() {
     setError(null);
 
     try {
+      // Update the user in the database
       const { error: dbError } = await supabase
         .from('users')
         .update({
           full_name: editingUser.full_name,
           mobile: editingUser.mobile,
-          role: editingUser.role
+          role: editingUser.role,
+          updated_at: new Date().toISOString()
         })
         .eq('id', editingUser.id);
 
-      if (dbError) throw new Error(dbError.message);
+      if (dbError) {
+        console.error('Error updating user:', dbError);
+        throw new Error(dbError.message);
+      }
 
-      // Update users state
+      // Fetch the updated user to ensure we have the latest data
+      const { data: updatedUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', editingUser.id)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching updated user:', fetchError);
+        throw new Error(fetchError.message);
+      }
+
+      // Update users state with the fresh data
       setUsers(prevUsers => 
         prevUsers.map(user => 
-          user.id === editingUser.id ? editingUser : user
+          user.id === editingUser.id ? updatedUser : user
         )
       );
 
       setIsEditModalOpen(false);
       setEditingUser(null);
     } catch (err) {
+      console.error('Error in handleEditUser:', err);
       setError(err instanceof Error ? err.message : 'Failed to update user');
     } finally {
       setLoading(false);
