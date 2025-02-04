@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { BiometricAuth } from './BiometricAuth'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -127,6 +128,8 @@ export default function LoginForm() {
               />
             </div>
           </div>
+
+          <BiometricAuth />
 
           <div>
             <button
