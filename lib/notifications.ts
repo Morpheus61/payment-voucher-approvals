@@ -1,0 +1,61 @@
+import { supabase } from './supabaseClient'
+
+export async function requestNotificationPermission() {
+  if (!('Notification' in window)) {
+    console.log('This browser does not support notifications')
+    return false
+  }
+
+  const permission = await Notification.requestPermission()
+  return permission === 'granted'
+}
+
+export async function subscribeToPushNotifications() {
+  try {
+    const registration = await navigator.serviceWorker.ready
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    })
+
+    // Store the subscription in Supabase
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .upsert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        subscription: JSON.stringify(subscription),
+        updated_at: new Date().toISOString()
+      })
+
+    if (error) throw error
+    return true
+  } catch (error) {
+    console.error('Error subscribing to push notifications:', error)
+    return false
+  }
+}
+
+export async function sendNotification(userId: string, title: string, body: string, data?: any) {
+  try {
+    const response = await fetch('/api/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        notification: {
+          title,
+          body,
+          data
+        }
+      })
+    })
+
+    if (!response.ok) throw new Error('Failed to send notification')
+    return true
+  } catch (error) {
+    console.error('Error sending notification:', error)
+    return false
+  }
+}

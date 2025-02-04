@@ -71,6 +71,47 @@ define(['./workbox-e43f5367'], (function (workbox) { 'use strict';
 
   importScripts();
   self.skipWaiting();
+
+  // Handle push notifications
+  self.addEventListener('push', function(event) {
+    if (!event.data) return;
+
+    try {
+      const data = event.data.json();
+      const options = {
+        body: data.body,
+        icon: '/icons/Logo1.png',
+        badge: '/icons/Logo1.png',
+        vibrate: [200, 100, 200],
+        data: data.data,
+        actions: [
+          {
+            action: 'open',
+            title: 'View',
+          }
+        ]
+      };
+
+      event.waitUntil(
+        self.registration.showNotification(data.title, options)
+      );
+    } catch (err) {
+      console.error('Error showing notification:', err);
+    }
+  });
+
+  // Handle notification clicks
+  self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+
+    if (event.action === 'open' && event.notification.data) {
+      const url = event.notification.data.url || '/admin';
+      event.waitUntil(
+        clients.openWindow(url)
+      );
+    }
+  });
+
   workbox.clientsClaim();
   workbox.registerRoute("/", new workbox.NetworkFirst({
     "cacheName": "start-url",
