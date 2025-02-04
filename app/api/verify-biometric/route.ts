@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/auth'
 
 // Validate environment variables
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Supabase configuration is missing - check environment variables')
 }
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
-)
-
 export async function POST(req: Request) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+      throw new Error('Missing Supabase configuration');
+    }
+    
     const { assertion, credentialId } = await req.json()
 
     // Get stored credential from database
@@ -61,15 +59,26 @@ export async function POST(req: Request) {
 
     if (signInError) throw signInError
 
-    return NextResponse.json({ 
-      message: 'Biometric verification successful',
-      session 
+    // After successful biometric verification
+    await supabase.auth.admin.updateUserById(credential.user_id, {
+      password: Math.random().toString(36).slice(-8) // Invalidate temporary password
+    })
+
+    // Refresh user session
+    const { data: refreshedSession } = await supabase.auth.refreshSession()
+    if (!refreshedSession?.user) throw new Error('Session refresh failed')
+
+    // Set secure HTTP-only cookie
+    const cookie = `sb-access-token=${refreshedSession.session.access_token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`;
+    return new NextResponse(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Set-Cookie': cookie }
     })
   } catch (error: any) {
-    console.error('Error verifying biometric:', error)
+    console.error('Verification error:', error);
     return NextResponse.json(
       { error: error.message },
-      { status: 400 }
-    )
+      { status: 401 }
+    );
   }
 }

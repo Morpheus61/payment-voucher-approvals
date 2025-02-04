@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/auth'
 
 export function BiometricAuth() {
   const [biometricSupported, setBiometricSupported] = useState(false)
@@ -17,17 +17,23 @@ export function BiometricAuth() {
     }
   }, [])
 
-  const registerBiometric = async () => {
+  const handleRegisterBiometric = async () => {
     try {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      
+      // Verify valid session exists
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session?.user) {
+        throw new Error('Please sign in with your credentials first');
+      }
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
+      // Validate active session
+      if (!session) {
+        throw new Error('Please authenticate with your credentials first');
+      }
 
-      // Generate random challenge
-      const challenge = new Uint8Array(32)
+      // Proceed with WebAuthn registration
+      const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge)
 
       // Create credential options
@@ -39,9 +45,9 @@ export function BiometricAuth() {
             id: window.location.hostname
           },
           user: {
-            id: Uint8Array.from(user.id, c => c.charCodeAt(0)),
-            name: user.email!,
-            displayName: user.email!
+            id: Uint8Array.from(session.user.id, c => c.charCodeAt(0)),
+            name: session.user.email!,
+            displayName: session.user.email!
           },
           pubKeyCredParams: [
             { type: 'public-key', alg: -7 }, // ES256
@@ -64,7 +70,7 @@ export function BiometricAuth() {
       const { error: dbError } = await supabase
         .from('user_credentials')
         .insert({
-          user_id: user.id,
+          user_id: session.user.id,
           credential_id: btoa(Array.from(new Uint8Array((credential as PublicKeyCredential).rawId), c => String.fromCharCode(c)).join('')),
           public_key: JSON.stringify(credential),
           created_at: new Date().toISOString()
@@ -74,10 +80,9 @@ export function BiometricAuth() {
 
       alert('Biometric authentication registered successfully!')
     } catch (err) {
-      console.error('Error registering biometric:', err)
-      setError(err instanceof Error ? err.message : 'Failed to register biometric')
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -150,7 +155,7 @@ export function BiometricAuth() {
   return (
     <div className="mt-4">
       <button
-        onClick={registerBiometric}
+        onClick={handleRegisterBiometric}
         disabled={loading}
         className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 mb-2"
       >
