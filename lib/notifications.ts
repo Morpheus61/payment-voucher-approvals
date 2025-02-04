@@ -12,10 +12,17 @@ export async function requestNotificationPermission() {
 
 export async function subscribeToPushNotifications() {
   try {
+    // Check if VAPID public key is available
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+    if (!vapidPublicKey) {
+      console.log('Push notifications are not configured')
+      return false
+    }
+
     const registration = await navigator.serviceWorker.ready
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      applicationServerKey: vapidPublicKey
     })
 
     // Store the subscription in Supabase
@@ -52,7 +59,15 @@ export async function sendNotification(userId: string, title: string, body: stri
       })
     })
 
-    if (!response.ok) throw new Error('Failed to send notification')
+    if (!response.ok) {
+      const error = await response.json()
+      // If push notifications are not configured, log it but don't treat it as an error
+      if (response.status === 501) {
+        console.log('Push notifications are not configured')
+        return true
+      }
+      throw new Error(error.error || 'Failed to send notification')
+    }
     return true
   } catch (error) {
     console.error('Error sending notification:', error)

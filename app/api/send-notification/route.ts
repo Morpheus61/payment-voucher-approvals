@@ -2,20 +2,34 @@ import { NextResponse } from 'next/server'
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize web-push with VAPID keys
-webpush.setVapidDetails(
-  'mailto:your-email@example.com',
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
+// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_KEY!
 )
 
+// Initialize web-push only if VAPID keys are available
+const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    'mailto:your-email@example.com',
+    vapidPublicKey,
+    vapidPrivateKey
+  )
+}
+
 export async function POST(req: Request) {
   try {
+    // Check if push notifications are configured
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      return NextResponse.json(
+        { error: 'Push notifications are not configured' },
+        { status: 501 }
+      )
+    }
+
     const { userId, notification } = await req.json()
 
     // Get user's push subscription
