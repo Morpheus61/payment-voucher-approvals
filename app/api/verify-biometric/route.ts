@@ -1,17 +1,34 @@
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/auth'
 
 // Validate environment variables
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Supabase configuration is missing - check environment variables')
 }
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-      throw new Error('Missing Supabase configuration');
-    }
-    
+    const cookieStore = cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options) {
+            cookieStore.delete({ name, ...options })
+          }
+        }
+      }
+    )
+
     const { assertion, credentialId } = await req.json()
 
     // Get stored credential from database
