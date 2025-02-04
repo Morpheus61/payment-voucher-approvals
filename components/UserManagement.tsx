@@ -140,14 +140,13 @@ export default function UserManagement() {
         `
       })
 
-      // Reset form and refresh users list
+      // Reset form
       setNewUser({
         email: '',
         role: 'requester',
         full_name: '',
         mobile: ''
       })
-      fetchUsers()
     } catch (err) {
       console.error('Error adding user:', err)
       setError(err instanceof Error ? err.message : 'Failed to add user')
@@ -178,7 +177,7 @@ export default function UserManagement() {
 
       setIsEditModalOpen(false)
       setEditingUser(null)
-      fetchUsers()
+      // Removed fetchUsers() call since realtime subscription will handle the update
     } catch (err) {
       console.error('Error updating user:', err)
       setError(err instanceof Error ? err.message : 'Failed to update user')
@@ -201,7 +200,7 @@ export default function UserManagement() {
 
       if (dbError) throw new Error(dbError.message)
 
-      fetchUsers()
+      // Removed fetchUsers() call since realtime subscription will handle the update
     } catch (err) {
       console.error('Error deleting user:', err)
       setError(err instanceof Error ? err.message : 'Failed to delete user')
