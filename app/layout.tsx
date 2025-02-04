@@ -1,12 +1,14 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/AuthProvider'
+import InstallPrompt from '@/components/InstallPrompt'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'Payment Voucher Approvals',
-  description: 'Streamline your payment voucher approval process'
+  description: 'Streamline your payment voucher approval process',
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({
@@ -17,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <InstallPrompt />
+        </AuthProvider>
       </body>
     </html>
   )
