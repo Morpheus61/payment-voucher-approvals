@@ -1,28 +1,31 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function LoginForm() {
+function RedirectHandler() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        router.push('/admin')
+      }
+    }
+    checkSession()
+  }, [router])
+
+  return null
+}
+
+export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Check if we already have a session
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        const redirectTo = searchParams.get('redirectTo') || '/admin'
-        window.location.href = redirectTo
-      }
-    }
-    checkSession()
-  }, [searchParams])
+  const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,9 +46,7 @@ export default function LoginForm() {
         throw new Error('No user data returned')
       }
 
-      // Get redirect path from URL or default to admin
-      const redirectTo = searchParams.get('redirectTo') || '/admin'
-      window.location.href = redirectTo
+      router.push('/admin')
       
     } catch (err) {
       console.error('Login error:', err)
@@ -55,7 +56,8 @@ export default function LoginForm() {
   }
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <>
+      <RedirectHandler />
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div>
@@ -126,6 +128,6 @@ export default function LoginForm() {
           </form>
         </div>
       </div>
-    </Suspense>
+    </>
   )
 }
