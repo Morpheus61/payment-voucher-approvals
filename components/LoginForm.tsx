@@ -1,15 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check if we already have a session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const redirectTo = searchParams.get('redirectTo') || '/admin'
+        window.location.href = redirectTo
+      }
+    }
+    checkSession()
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,15 +32,20 @@ export default function LoginForm() {
     setError(null)
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
       })
 
       if (signInError) throw signInError
 
-      // Simple redirect after successful login
-      window.location.href = '/admin'
+      if (!data?.user) {
+        throw new Error('No user data returned')
+      }
+
+      // Get redirect path from URL or default to admin
+      const redirectTo = searchParams.get('redirectTo') || '/admin'
+      window.location.href = redirectTo
       
     } catch (err) {
       console.error('Login error:', err)
