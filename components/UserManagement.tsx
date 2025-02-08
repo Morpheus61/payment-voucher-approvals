@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient' // Correct singleton import
 import { sendEmail } from '@/lib/email'
 
 type User = {
@@ -116,7 +116,7 @@ export default function UserManagement() {
       }
 
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      if (!session?.access_token) {
         throw new Error('Not authenticated')
       }
 
@@ -231,14 +231,25 @@ export default function UserManagement() {
     setError(null)
 
     try {
-      const { error: dbError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
 
-      if (dbError) throw new Error(dbError.message)
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
 
-      // Removed fetchUsers() call since realtime subscription will handle the update
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.details || data.error || 'Failed to delete user')
+      }
+
+      // Update will happen via realtime subscription
     } catch (err) {
       console.error('Error deleting user:', err)
       setError(err instanceof Error ? err.message : 'Failed to delete user')

@@ -1,11 +1,17 @@
 // app/layout.tsx
-export const viewport = {
-  themeColor: '#ffffff',
-  width: 'device-width',
-  initialScale: 1,
+'use client'
+
+import { useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+
+interface RootLayoutProps {
+  children: React.ReactNode
 }
 
-export const metadata = {
-  title: 'Payment Voucher Approvals',
-  description: 'Approval system for payment vouchers',
+export default function RootLayout({ children }: RootLayoutProps) {
+  useEffect(() => {
+    console.log('Supabase client initialized:', !!supabase)
+  }, [])
+  
+  return <>{children}</>
 }

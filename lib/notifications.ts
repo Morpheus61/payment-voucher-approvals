@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabaseClient'
 
 // Initialize Supabase client only when needed
 function getSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Database configuration is missing')
-  }
-
-  return createClient(supabaseUrl, supabaseKey)
+  return supabase
 }
 
 export async function requestNotificationPermission() {
@@ -39,13 +32,13 @@ export async function subscribeToPushNotifications() {
 
     try {
       // Get Supabase client
-      const supabase = getSupabaseClient()
+      const supabaseClient = getSupabaseClient()
 
       // Store the subscription in Supabase
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('push_subscriptions')
         .upsert({
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: (await supabaseClient.auth.getUser()).data.user?.id,
           subscription: JSON.stringify(subscription),
           updated_at: new Date().toISOString()
         })

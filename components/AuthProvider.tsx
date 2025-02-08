@@ -2,7 +2,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { supabase } from '@/lib/supabaseClient' // Correct singleton import
 import { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 
