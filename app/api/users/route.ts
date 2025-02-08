@@ -21,10 +21,13 @@ export async function GET() {
     }
 
     // Get users from auth.users table
-    const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers()
-    
-    if (authError) {
-      console.error('Error fetching auth users:', authError)
+    const { data: { users: authUsers }, error: listUsersError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
+    })
+
+    if (listUsersError) {
+      console.error('Error fetching auth users:', listUsersError)
       return NextResponse.json({ error: 'Failed to fetch auth users' }, { status: 500 })
     }
 
@@ -69,9 +72,9 @@ export async function POST(request: Request) {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    const { data: { user }, error: getUserError } = await supabaseAdmin.auth.getUser(token)
     
-    if (authError || !user) {
+    if (getUserError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -90,11 +93,17 @@ export async function POST(request: Request) {
     const newUser = await request.json()
 
     // Check both auth.users and public.users tables
-    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers({
-      filters: [
-        { property: 'email', operator: 'eq', value: newUser.email }
-      ]
+    const { data: { users: authUsers }, error: listUsersError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000
     })
+
+    if (listUsersError) {
+      console.error('Error fetching auth users:', listUsersError)
+      return NextResponse.json({ error: 'Failed to fetch auth users' }, { status: 500 })
+    }
+
+    const existingAuthUser = authUsers.find(user => user.email === newUser.email)
 
     const { data: existingUser } = await supabaseAdmin
       .from('users')
@@ -102,7 +111,7 @@ export async function POST(request: Request) {
       .eq('email', newUser.email)
       .single()
 
-    if (existingAuthUser?.users?.length > 0 || existingUser) {
+    if (existingAuthUser || existingUser) {
       // If user exists in either table, return error
       return NextResponse.json(
         { error: 'A user with this email already exists' },
