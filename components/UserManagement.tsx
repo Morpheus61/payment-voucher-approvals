@@ -112,9 +112,9 @@ export default function UserManagement() {
         body: JSON.stringify(newUser)
       })
 
+      const data = await response.json()
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create user')
+        throw new Error(data.error || 'Failed to create user')
       }
 
       // Send welcome email
@@ -132,19 +132,17 @@ export default function UserManagement() {
         `
       })
 
-      // Reset form
+      // Clear form and refresh user list
       setNewUser({
         email: '',
         role: 'requester',
         full_name: '',
         mobile: ''
       })
-
-      // Refresh the users list
       await fetchUsers()
     } catch (err) {
       console.error('Error adding user:', err)
-      setError(err instanceof Error ? err.message : 'Failed to add user')
+      setError(err instanceof Error ? err.message : 'Failed to create user')
     } finally {
       setLoading(false)
     }

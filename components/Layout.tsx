@@ -1,13 +1,11 @@
-import { ReactNode } from 'react';
-
-interface LayoutProps {
-  children: ReactNode;
+// app/layout.tsx
+export const viewport = {
+  themeColor: '#ffffff',
+  width: 'device-width',
+  initialScale: 1,
 }
 
-export default function Layout({ children }: LayoutProps) {
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <main className="container mx-auto p-4">{children}</main>
-    </div>
-  );
+export const metadata = {
+  title: 'Payment Voucher Approvals',
+  description: 'Approval system for payment vouchers',
 }
