@@ -98,12 +98,21 @@ export default function UserManagement() {
     setError(null)
 
     try {
+      // Validate mobile number format
+      const mobileRegex = /^\+?[0-9]{10,12}$/
+      if (!mobileRegex.test(newUser.mobile)) {
+        throw new Error('Invalid mobile number format. Please enter 10-12 digits with optional + prefix')
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         throw new Error('Not authenticated')
       }
 
-      console.log('Creating new user:', newUser) // Log the user data being sent
+      console.log('Creating new user:', {
+        ...newUser,
+        mobile: newUser.mobile.replace(/\+/g, '') // Remove + from mobile number
+      })
 
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -111,11 +120,14 @@ export default function UserManagement() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify(newUser)
+        body: JSON.stringify({
+          ...newUser,
+          mobile: newUser.mobile.replace(/\+/g, '') // Remove + from mobile number
+        })
       })
 
       const data = await response.json()
-      console.log('Server response:', data) // Log the server response
+      console.log('Server response:', data)
 
       if (!response.ok) {
         throw new Error(data.error || data.details || 'Failed to create user')

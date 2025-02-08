@@ -162,18 +162,31 @@ export async function POST(request: Request) {
     }
 
     // Add user details to users table
+    const formattedMobile = newUser.mobile?.replace(/\+/g, '') // Remove + from mobile number if present
+    
+    console.log('Attempting to insert user with data:', {
+      id: authData.user.id,
+      email: newUser.email,
+      full_name: newUser.full_name,
+      mobile: formattedMobile,
+      role: newUser.role || 'requester'
+    })
+
     const { error: dbError } = await supabaseAdmin
       .from('users')
       .insert([{
-        id: authData.user.id, // Ensure we're using the auth user's ID
+        id: authData.user.id,
         email: newUser.email,
         full_name: newUser.full_name,
-        mobile: newUser.mobile,
-        role: newUser.role || 'requester' // Set default role if not provided
+        mobile: formattedMobile,
+        role: newUser.role || 'requester'
       }])
 
     if (dbError) {
       console.error('Error inserting into users table:', dbError)
+      console.error('Error code:', dbError.code)
+      console.error('Error details:', dbError.details)
+      
       // Cleanup: delete the auth user if db insert fails
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       if (deleteError) {
@@ -181,7 +194,7 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ 
         error: 'Failed to create user in database',
-        details: dbError.message 
+        details: `${dbError.message}${dbError.details ? ` - ${dbError.details}` : ''}`
       }, { status: 400 })
     }
 
