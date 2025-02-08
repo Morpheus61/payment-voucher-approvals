@@ -103,6 +103,8 @@ export default function UserManagement() {
         throw new Error('Not authenticated')
       }
 
+      console.log('Creating new user:', newUser) // Log the user data being sent
+
       const response = await fetch('/api/users', {
         method: 'POST',
         headers: {
@@ -113,24 +115,31 @@ export default function UserManagement() {
       })
 
       const data = await response.json()
+      console.log('Server response:', data) // Log the server response
+
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create user')
+        throw new Error(data.error || data.details || 'Failed to create user')
       }
 
       // Send welcome email
-      await sendEmail({
-        to: newUser.email,
-        subject: 'Welcome to Payment Voucher Approvals',
-        html: `
-          <h1>Welcome to Payment Voucher Approvals</h1>
-          <p>Your account has been created with the following details:</p>
-          <ul>
-            <li>Role: ${newUser.role}</li>
-            <li>Name: ${newUser.full_name}</li>
-          </ul>
-          <p>Please use the password reset link in your email to set your password.</p>
-        `
-      })
+      try {
+        await sendEmail({
+          to: newUser.email,
+          subject: 'Welcome to Payment Voucher Approvals',
+          html: `
+            <h1>Welcome to Payment Voucher Approvals</h1>
+            <p>Your account has been created with the following details:</p>
+            <ul>
+              <li>Role: ${newUser.role}</li>
+              <li>Name: ${newUser.full_name}</li>
+            </ul>
+            <p>Please use the password reset link in your email to set your password.</p>
+          `
+        })
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError)
+        // Don't throw error here, as user is already created
+      }
 
       // Clear form and refresh user list
       setNewUser({

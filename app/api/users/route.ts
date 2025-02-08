@@ -60,6 +60,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    console.log('Received request to create new user')
+    
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -68,14 +70,21 @@ export async function POST(request: Request) {
     // Verify the current user has admin access
     const authHeader = request.headers.get('Authorization')
     if (!authHeader) {
+      console.error('No authorization header')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: getUserError } = await supabaseAdmin.auth.getUser(token)
     
-    if (getUserError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (getUserError) {
+      console.error('Error getting user from token:', getUserError)
+      return NextResponse.json({ error: 'Unauthorized', details: getUserError.message }, { status: 401 })
+    }
+    
+    if (!user) {
+      console.error('No user found from token')
+      return NextResponse.json({ error: 'Unauthorized - User not found' }, { status: 401 })
     }
 
     // Verify user is an admin
@@ -85,12 +94,28 @@ export async function POST(request: Request) {
       .eq('id', user.id)
       .single()
 
-    if (userError || !userData || !['admin', 'super_admin'].includes(userData.role)) {
+    if (userError) {
+      console.error('Error fetching user role:', userError)
+      return NextResponse.json({ error: 'Failed to verify user role', details: userError.message }, { status: 500 })
+    }
+
+    if (!userData || !['admin', 'super_admin'].includes(userData.role)) {
+      console.error('User not authorized - Required admin role')
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
     }
 
     // Get new user data from request body
     const newUser = await request.json()
+    console.log('New user data:', newUser)
+
+    // Validate required fields
+    if (!newUser.email || !newUser.full_name || !newUser.role) {
+      console.error('Missing required fields')
+      return NextResponse.json({ 
+        error: 'Missing required fields',
+        details: 'Email, full name, and role are required'
+      }, { status: 400 })
+    }
 
     // Check both auth.users and public.users tables
     const { data: { users: authUsers }, error: listUsersError } = await supabaseAdmin.auth.admin.listUsers({
