@@ -98,31 +98,23 @@ export default function UserManagement() {
     setError(null)
 
     try {
-      // Add user to Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: Math.random().toString(36).slice(-8),
-        email_confirm: true
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(newUser)
       })
 
-      if (authError) throw new Error(authError.message)
-
-      // Add user details to users table
-      const { error: dbError } = await supabase
-        .from('users')
-        .insert([{
-          id: authData.user?.id,
-          email: newUser.email,
-          full_name: newUser.full_name,
-          mobile: newUser.mobile,
-          role: newUser.role
-        }])
-
-      if (dbError) {
-        if (authData.user?.id) {
-          await supabase.auth.admin.deleteUser(authData.user.id)
-        }
-        throw new Error(dbError.message)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create user')
       }
 
       // Send welcome email
@@ -147,6 +139,9 @@ export default function UserManagement() {
         full_name: '',
         mobile: ''
       })
+
+      // Refresh the users list
+      await fetchUsers()
     } catch (err) {
       console.error('Error adding user:', err)
       setError(err instanceof Error ? err.message : 'Failed to add user')
