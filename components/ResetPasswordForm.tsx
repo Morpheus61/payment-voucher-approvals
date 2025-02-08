@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 export default function ResetPasswordForm() {
   const [password, setPassword] = useState('')
@@ -12,7 +12,6 @@ export default function ResetPasswordForm() {
   const [loading, setLoading] = useState(false)
   
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
