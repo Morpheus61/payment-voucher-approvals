@@ -9,17 +9,46 @@ export async function GET() {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { data: users, error } = await supabaseAdmin
+    // Get users from public.users table
+    const { data: users, error: usersError } = await supabaseAdmin
       .from('users')
       .select('id, email, full_name, mobile, role, created_at, updated_at')
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error fetching users:', error)
+    if (usersError) {
+      console.error('Error fetching users:', usersError)
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
-    return NextResponse.json({ users })
+    // Get users from auth.users table
+    const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers()
+    
+    if (authError) {
+      console.error('Error fetching auth users:', authError)
+      return NextResponse.json({ error: 'Failed to fetch auth users' }, { status: 500 })
+    }
+
+    // Check for inconsistencies
+    const inconsistentUsers = authUsers.filter(authUser => 
+      !users.some(user => user.id === authUser.id)
+    ).map(user => ({
+      id: user.id,
+      email: user.email,
+      created_at: user.created_at
+    }))
+
+    if (inconsistentUsers.length > 0) {
+      console.error('Found users in auth but not in public.users:', inconsistentUsers)
+    }
+
+    return NextResponse.json({ 
+      users,
+      debug: {
+        authUserCount: authUsers.length,
+        publicUserCount: users.length,
+        inconsistentUsers
+      }
+    })
   } catch (error) {
     console.error('Server error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -59,6 +88,27 @@ export async function POST(request: Request) {
 
     // Get new user data from request body
     const newUser = await request.json()
+
+    // Check both auth.users and public.users tables
+    const { data: existingAuthUser } = await supabaseAdmin.auth.admin.listUsers({
+      filters: [
+        { property: 'email', operator: 'eq', value: newUser.email }
+      ]
+    })
+
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id, email')
+      .eq('email', newUser.email)
+      .single()
+
+    if (existingAuthUser?.users?.length > 0 || existingUser) {
+      // If user exists in either table, return error
+      return NextResponse.json(
+        { error: 'A user with this email already exists' },
+        { status: 400 }
+      )
+    }
 
     // Create user in Auth
     const { data: authData, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
