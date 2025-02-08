@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     }
 
     // Verify user is an admin
-    const { data: userData, error: userError } = await supabaseAdmin
+    const { data: adminData, error: userError } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to verify user role', details: userError.message }, { status: 500 })
     }
 
-    if (!userData || !['admin', 'super_admin'].includes(userData.role)) {
+    if (!adminData || !['admin', 'super_admin'].includes(adminData.role)) {
       console.error('User not authorized - Required admin role')
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 403 })
     }
@@ -164,37 +164,49 @@ export async function POST(request: Request) {
     // Add user details to users table
     const formattedMobile = newUser.mobile?.replace(/\+/g, '') // Remove + from mobile number if present
     
-    console.log('Attempting to insert user with data:', {
+    const newUserData = {
       id: authData.user.id,
       email: newUser.email,
       full_name: newUser.full_name,
       mobile: formattedMobile,
       role: newUser.role || 'requester'
-    })
+    }
+    
+    console.log('Attempting to insert user with data:', newUserData)
 
-    const { error: dbError } = await supabaseAdmin
-      .from('users')
-      .insert([{
-        id: authData.user.id,
-        email: newUser.email,
-        full_name: newUser.full_name,
-        mobile: formattedMobile,
-        role: newUser.role || 'requester'
-      }])
+    try {
+      const { error: dbError } = await supabaseAdmin
+        .from('users')
+        .insert([newUserData])
 
-    if (dbError) {
-      console.error('Error inserting into users table:', dbError)
-      console.error('Error code:', dbError.code)
-      console.error('Error details:', dbError.details)
-      
+      if (dbError) {
+        console.error('Database error details:', {
+          code: dbError.code,
+          message: dbError.message,
+          details: dbError.details,
+          hint: dbError.hint
+        })
+        
+        // Cleanup: delete the auth user if db insert fails
+        const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+        if (deleteError) {
+          console.error('Failed to cleanup auth user after db error:', deleteError)
+        }
+        return NextResponse.json({ 
+          error: 'Failed to create user in database',
+          details: `${dbError.message}${dbError.details ? ` - ${dbError.details}` : ''}${dbError.hint ? ` (${dbError.hint})` : ''}`
+        }, { status: 400 })
+      }
+    } catch (error) {
+      console.error('Unexpected error during database insert:', error)
       // Cleanup: delete the auth user if db insert fails
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       if (deleteError) {
-        console.error('Failed to cleanup auth user after db error:', deleteError)
+        console.error('Failed to cleanup auth user after unexpected error:', deleteError)
       }
       return NextResponse.json({ 
         error: 'Failed to create user in database',
-        details: `${dbError.message}${dbError.details ? ` - ${dbError.details}` : ''}`
+        details: error instanceof Error ? error.message : 'Unknown error occurred'
       }, { status: 400 })
     }
 

@@ -98,6 +98,17 @@ export default function UserManagement() {
     setError(null)
 
     try {
+      // Validate required fields
+      if (!newUser.email || !newUser.full_name || !newUser.mobile) {
+        throw new Error('Please fill in all required fields')
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(newUser.email)) {
+        throw new Error('Please enter a valid email address')
+      }
+
       // Validate mobile number format
       const mobileRegex = /^\+?[0-9]{10,12}$/
       if (!mobileRegex.test(newUser.mobile)) {
@@ -109,10 +120,11 @@ export default function UserManagement() {
         throw new Error('Not authenticated')
       }
 
-      console.log('Creating new user:', {
+      const userData = {
         ...newUser,
         mobile: newUser.mobile.replace(/\+/g, '') // Remove + from mobile number
-      })
+      }
+      console.log('Creating new user:', userData)
 
       const response = await fetch('/api/users', {
         method: 'POST',
@@ -120,17 +132,14 @@ export default function UserManagement() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({
-          ...newUser,
-          mobile: newUser.mobile.replace(/\+/g, '') // Remove + from mobile number
-        })
+        body: JSON.stringify(userData)
       })
 
       const data = await response.json()
       console.log('Server response:', data)
 
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Failed to create user')
+        throw new Error(data.details || data.error || 'Failed to create user')
       }
 
       // Send welcome email
