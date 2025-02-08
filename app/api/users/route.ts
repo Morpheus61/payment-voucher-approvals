@@ -127,24 +127,37 @@ export async function POST(request: Request) {
     })
 
     if (createAuthError) {
+      console.error('Error creating auth user:', createAuthError)
       return NextResponse.json({ error: createAuthError.message }, { status: 400 })
+    }
+
+    if (!authData?.user?.id) {
+      console.error('Auth user created but no ID returned')
+      return NextResponse.json({ error: 'Failed to create user properly' }, { status: 500 })
     }
 
     // Add user details to users table
     const { error: dbError } = await supabaseAdmin
       .from('users')
       .insert([{
-        id: authData.user.id,
+        id: authData.user.id, // Ensure we're using the auth user's ID
         email: newUser.email,
         full_name: newUser.full_name,
         mobile: newUser.mobile,
-        role: newUser.role
+        role: newUser.role || 'requester' // Set default role if not provided
       }])
 
     if (dbError) {
+      console.error('Error inserting into users table:', dbError)
       // Cleanup: delete the auth user if db insert fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      return NextResponse.json({ error: dbError.message }, { status: 400 })
+      const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      if (deleteError) {
+        console.error('Failed to cleanup auth user after db error:', deleteError)
+      }
+      return NextResponse.json({ 
+        error: 'Failed to create user in database',
+        details: dbError.message 
+      }, { status: 400 })
     }
 
     // Send password reset email
