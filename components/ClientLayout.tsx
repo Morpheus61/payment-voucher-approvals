@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCookie } from 'cookies-next'
-import { supabase } from '@/lib/auth'
+import { supabase } from '@/lib/supabaseClient'
 import { AuthProvider } from '@/components/AuthProvider'
 import InstallPrompt from '@/components/InstallPrompt'
 
