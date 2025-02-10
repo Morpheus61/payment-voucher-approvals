@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
-import { BiometricAuth } from './BiometricAuth'
+import BiometricAuth from './BiometricAuth'
 import { startAuthentication } from '@simplewebauthn/browser';
 
 export default function LoginForm() {

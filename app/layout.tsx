@@ -1,16 +1,19 @@
 // app/layout.tsx
 import './globals.css'
 import { Inter } from 'next/font/google'
-import ClientLayout from '@/components/ClientLayout'
 
 const inter = Inter({ subsets: ['latin'] })
 
+export const viewport = {
+  themeColor: '#000000',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+}
+
 export const metadata = {
-  title: 'Relish Approvals',
-  description: 'Manage and approve payment vouchers for Relish Hao Hao Chi Foods',
-  manifest: '/manifest.json',
-  themeColor: '#ffffff',
-  viewport: 'minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, viewport-fit=cover'
+  title: 'Payment Voucher Approvals',
+  description: 'Approve payment vouchers securely with biometric authentication',
 }
 
 export default function RootLayout({
@@ -19,12 +22,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.className}>
-      <body>
-        <ClientLayout>
-          {children}
-        </ClientLayout>
-      </body>
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
     </html>
   )
 }

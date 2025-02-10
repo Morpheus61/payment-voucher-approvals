@@ -2,7 +2,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/auth'
 
-export function BiometricAuth() {
+interface BiometricAuthProps {
+  handleBiometricLogin: () => Promise<void>;
+}
+
+export default function BiometricAuth({ handleBiometricLogin }: BiometricAuthProps) {
   const [biometricSupported, setBiometricSupported] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

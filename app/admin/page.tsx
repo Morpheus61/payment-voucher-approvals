@@ -1,109 +1,105 @@
-import React from 'react';
-import DashboardLayout from '@/components/AdminDashboard'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import DashboardLayout from '@/components/AdminDashboard';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 interface User {
   id: string;
   email: string;
-  role: string;
+  created_at: string;
 }
 
-interface UserTableProps {
-  users: User[];
-  deleteUser: (userId: string) => void;
-}
-
-interface AdminDashboardProps {
-  children: React.ReactNode;
-}
-
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-}
-
-const PROTECTED_USERS = [
-  'compliance@foodstream.in',
-  'motty.philip@gmail.com',
-  'relishfoodsalpy@gmail.com'
-];
-
-const UserTable = ({ users, deleteUser }: UserTableProps) => (
-  <table className="table">
-    <thead>
-      <tr>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {users.map((user: User) => (
-        <tr key={user.id}>
-          <td>{user.email}</td>
-          <td>{user.role}</td>
-          <td>
-            {!PROTECTED_USERS.includes(user.email) && (
-              <button 
+const UserTable: React.FC<{
+  users?: User[];
+  deleteUser: (userId: string) => Promise<void>;
+}> = ({ users = [], deleteUser }) => (
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {users.map((user) => (
+          <tr key={user.id}>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {new Date(user.created_at).toLocaleDateString()}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <button
                 onClick={() => deleteUser(user.id)}
-                className="btn btn-error"
+                className="text-red-600 hover:text-red-900"
               >
                 Delete
               </button>
-            )}
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
-
-const AdminDashboardComponent = ({ children }: AdminDashboardProps) => (
-  <div className="admin-dashboard">
-    <h1>User Management</h1>
-    {children}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 );
 
 export default function AdminPage() {
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const router = useRouter();
+
   const deleteUser = async (userId: string): Promise<void> => {
     if (!confirm('Permanently delete this user?')) return;
-
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
     
-    if (error) {
-      alert('Deletion failed: ' + error.message);
-    } else {
-      await supabaseAdmin.from('users').delete().eq('id', userId);
-      refreshUsers();
+    try {
+      setLoading(true);
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (error) throw error;
+      
+      // Remove user from local state
+      setUsers(users.filter(user => user.id !== userId));
+      
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const [users, setUsers] = React.useState<User[]>([]);
-
-  React.useEffect(() => {
-    const fetchUsers = async () => {
-      const { data, error } = await supabaseAdmin.from('users').select('id, email, role');
-      if (error) {
-        alert('Failed to fetch users: ' + error.message);
-      } else {
-        setUsers(data);
-      }
-    };
-    fetchUsers();
-  }, []);
-
-  const refreshUsers = async (): Promise<void> => {
-    const { data, error } = await supabaseAdmin.from('users').select('id, email, role');
+  const fetchUsers = async () => {
+    const { data, error } = await supabaseAdmin.from('users').select('id, email, created_at');
     if (error) {
-      alert('Failed to refresh users: ' + error.message);
+      alert('Failed to fetch users: ' + error.message);
     } else {
       setUsers(data);
     }
   };
 
+  React.useEffect(() => {
+    fetchUsers();
+  }, []);
+
   return (
     <DashboardLayout>
-      <UserTable users={users} deleteUser={deleteUser} />
+      <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+        <div className="relative py-3 sm:max-w-xl sm:mx-auto">
+          <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
+            <div className="max-w-md mx-auto">
+              <div className="divide-y divide-gray-200">
+                <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
+                  <h2 className="text-2xl font-bold mb-8">Admin Dashboard</h2>
+                  {loading && <p>Loading...</p>}
+                  <UserTable users={users} deleteUser={deleteUser} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </DashboardLayout>
-  )
+  );
 }
