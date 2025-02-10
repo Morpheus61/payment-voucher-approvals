@@ -1,5 +1,25 @@
-import AdminDashboard from '@/components/AdminDashboard'
-import { supabaseAdmin } from '@/utils/supabaseAdmin'
+import React from 'react';
+import DashboardLayout from '@/components/AdminDashboard'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
+
+interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
+interface UserTableProps {
+  users: User[];
+  deleteUser: (userId: string) => void;
+}
+
+interface AdminDashboardProps {
+  children: React.ReactNode;
+}
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
 
 const PROTECTED_USERS = [
   'compliance@foodstream.in',
@@ -7,7 +27,7 @@ const PROTECTED_USERS = [
   'relishfoodsalpy@gmail.com'
 ];
 
-const UserTable = ({ users, deleteUser }) => (
+const UserTable = ({ users, deleteUser }: UserTableProps) => (
   <table className="table">
     <thead>
       <tr>
@@ -17,7 +37,7 @@ const UserTable = ({ users, deleteUser }) => (
       </tr>
     </thead>
     <tbody>
-      {users.map(user => (
+      {users.map((user: User) => (
         <tr key={user.id}>
           <td>{user.email}</td>
           <td>{user.role}</td>
@@ -37,8 +57,15 @@ const UserTable = ({ users, deleteUser }) => (
   </table>
 );
 
+const AdminDashboardComponent = ({ children }: AdminDashboardProps) => (
+  <div className="admin-dashboard">
+    <h1>User Management</h1>
+    {children}
+  </div>
+);
+
 export default function AdminPage() {
-  const deleteUser = async (userId: string) => {
+  const deleteUser = async (userId: string): Promise<void> => {
     if (!confirm('Permanently delete this user?')) return;
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -51,7 +78,7 @@ export default function AdminPage() {
     }
   };
 
-  const [users, setUsers] = React.useState([]);
+  const [users, setUsers] = React.useState<User[]>([]);
 
   React.useEffect(() => {
     const fetchUsers = async () => {
@@ -65,7 +92,7 @@ export default function AdminPage() {
     fetchUsers();
   }, []);
 
-  const refreshUsers = async () => {
+  const refreshUsers = async (): Promise<void> => {
     const { data, error } = await supabaseAdmin.from('users').select('id, email, role');
     if (error) {
       alert('Failed to refresh users: ' + error.message);
@@ -75,10 +102,8 @@ export default function AdminPage() {
   };
 
   return (
-    <main className="min-h-screen p-4">
-      <AdminDashboard>
-        <UserTable users={users} deleteUser={deleteUser} />
-      </AdminDashboard>
-    </main>
+    <DashboardLayout>
+      <UserTable users={users} deleteUser={deleteUser} />
+    </DashboardLayout>
   )
 }
