@@ -3,22 +3,15 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-let supabase: ReturnType<typeof createBrowserClient> | undefined
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (typeof window !== 'undefined') {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-
-  if (!url || !key) {
-    throw new Error(`
-      Missing Supabase configuration!
-      Verify Vercel environment variables:
-      - NEXT_PUBLIC_SUPABASE_URL: ${url ? '✓' : '✗'}
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY: ${key ? '✓' : '✗'}
-    `)
-  }
-
-  supabase = createBrowserClient(url, key)
+if (!supabaseUrl) {
+  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL')
 }
 
-export { supabase }
+if (!supabaseAnonKey) {
+  throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY')
+}
+
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
