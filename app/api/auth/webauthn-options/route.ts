@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST() {
   const options = await generateAuthenticationOptions({
+    rpID: process.env.RP_ID || 'localhost',
     timeout: 60000,
     userVerification: 'required',
   });
