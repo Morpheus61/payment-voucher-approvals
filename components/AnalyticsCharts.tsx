@@ -6,14 +6,9 @@ import {
   ResponsiveContainer
 } from 'recharts'
 import { supabase } from '@/lib/supabaseClient'
+import { Database } from '@/lib/database.types'
 
-type VoucherRequest = {
-  id: string
-  amount: number
-  head_of_account: string
-  status: 'pending' | 'approved' | 'rejected'
-  created_at: string
-}
+type VoucherRequest = Database['public']['Tables']['voucher_requests']['Row']
 
 type ChartData = {
   name: string
@@ -46,16 +41,17 @@ export default function AnalyticsCharts() {
 
       const { data, error } = await supabase
         .from('voucher_requests')
-        .select('*')
+        .select()
         .gte('created_at', thirtyDaysAgo.toISOString())
-        .returns<VoucherRequest[]>()
 
       if (error) throw error
 
+      const voucherRequests = data as VoucherRequest[]
+
       // Process data for expense by head of account
-      const groupedByAccount = (data || []).reduce<Record<string, number>>((acc, curr) => {
+      const groupedByAccount = voucherRequests.reduce<Record<string, number>>((acc, curr) => {
         const key = curr.head_of_account
-        acc[key] = (acc[key] || 0) + curr.amount
+        acc[key] = (acc[key] || 0) + Number(curr.amount)
         return acc
       }, {})
 
@@ -65,9 +61,9 @@ export default function AnalyticsCharts() {
       }))
 
       // Process data for daily trend
-      const groupedByDate = (data || []).reduce<Record<string, number>>((acc, curr) => {
+      const groupedByDate = voucherRequests.reduce<Record<string, number>>((acc, curr) => {
         const date = new Date(curr.created_at).toLocaleDateString()
-        acc[date] = (acc[date] || 0) + curr.amount
+        acc[date] = (acc[date] || 0) + Number(curr.amount)
         return acc
       }, {})
 
@@ -79,7 +75,7 @@ export default function AnalyticsCharts() {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
       // Process data for status distribution
-      const groupedByStatus = (data || []).reduce<Record<string, number>>((acc, curr) => {
+      const groupedByStatus = voucherRequests.reduce<Record<string, number>>((acc, curr) => {
         acc[curr.status] = (acc[curr.status] || 0) + 1
         return acc
       }, {})
