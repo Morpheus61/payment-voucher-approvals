@@ -1,16 +1,29 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Create two clients - one with anon key for client-side and one with service role for admin operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
+}
 
-if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-  throw new Error('Missing required Supabase environment variables')
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY')
 }
 
 // Client for public operations (client-side)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
-// Admin client for server-side operations
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
+// Only create admin client if service role key is available (server-side)
+export const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+  : null
