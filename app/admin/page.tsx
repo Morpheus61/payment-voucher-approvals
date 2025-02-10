@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabase } from '@/lib/supabaseClient';
 
 interface User {
   id: string;
@@ -50,66 +50,65 @@ const AdminDashboard = dynamic(() => import('@/components/AdminDashboard'), {
   ssr: false,
   loading: () => (
     <div className="min-h-screen flex items-center justify-center">
-      Loading dashboard...
+      Loading...
     </div>
   ),
 });
 
-const DashboardContent = () => {
-  const [loading, setLoading] = useState(false);
+function DashboardContent() {
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const deleteUser = async (userId: string): Promise<void> => {
-    if (!confirm('Permanently delete this user?')) return;
-    
-    try {
-      setLoading(true);
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-      if (error) throw error;
-      
-      // Remove user from local state
-      setUsers(users.filter(user => user.id !== userId));
-      
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('Failed to delete user');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    const { data, error } = await supabaseAdmin.from('users').select('id, email, created_at');
-    if (error) {
-      alert('Failed to fetch users: ' + error.message);
-    } else {
-      setUsers(data);
-    }
-  };
-
   React.useEffect(() => {
-    fetchUsers();
-  }, []);
+    const fetchUsers = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          router.push('/');
+          return;
+        }
 
-  return (
-    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
-      <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-        <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
-          <div className="max-w-md mx-auto">
-            <div className="divide-y divide-gray-200">
-              <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
-                <h2 className="text-2xl font-bold mb-8">Admin Dashboard</h2>
-                {loading && <p>Loading...</p>}
-                <UserTable users={users} deleteUser={deleteUser} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+        const { data: users, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setUsers(users || []);
+      } catch (error: any) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [router]);
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      setUsers(users.filter(user => user.id !== userId));
+    } catch (error: any) {
+      setError(error.message);
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return <UserTable users={users} deleteUser={deleteUser} />;
+}
 
 export default function AdminPage() {
   return (
