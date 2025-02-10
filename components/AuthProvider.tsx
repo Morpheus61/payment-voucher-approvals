@@ -3,13 +3,14 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient' // Correct singleton import
-import { User } from '@supabase/supabase-js'
+import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 
 type UserRole = 'super_admin' | 'requester' | 'approver' | null
 type AuthContextType = {
   user: User | null
   role: UserRole
+  session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -18,6 +19,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
+  session: null,
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
@@ -26,42 +28,59 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<UserRole>(null)
+  const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Initial session check
+    let mounted = true
+
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const currentUser = session?.user ?? null
-        setUser(currentUser)
-        
-        if (currentUser) {
-          const { data } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', currentUser.id)
-            .single()
-          
-          setRole(data?.role as UserRole)
-        } else {
-          setRole(null)
+        // Check active sessions
+        const {
+          data: { session: activeSession },
+          error: sessionError,
+        } = await supabase.auth.getSession()
+
+        if (sessionError) {
+          throw sessionError
+        }
+
+        if (mounted) {
+          if (activeSession) {
+            setSession(activeSession)
+            setUser(activeSession.user)
+            
+            const { data } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', activeSession.user.id)
+              .single()
+            
+            setRole(data?.role as UserRole)
+          }
+          setLoading(false)
         }
       } catch (error) {
         console.error('Auth initialization error:', error)
-      } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     initializeAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: AuthChangeEvent, session: Session | null) => {
         const currentUser = session?.user ?? null
         setUser(currentUser)
         
+        if (mounted) {
+          setSession(session)
+        }
+
         if (currentUser) {
           const { data } = await supabase
             .from('users')
@@ -74,10 +93,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole(null)
           router.push('/')
         }
+
+        if (event === 'SIGNED_OUT') {
+          setUser(null)
+          setSession(null)
+          setRole(null)
+        }
       }
     )
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
     }
   }, [router])
@@ -108,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     role,
+    session,
     loading,
     signIn,
     signOut,
