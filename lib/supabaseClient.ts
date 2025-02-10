@@ -3,26 +3,24 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-
-if (!supabaseUrl || supabaseUrl === 'undefined') {
-  throw new Error(`
-    Missing NEXT_PUBLIC_SUPABASE_URL!
-    Check Vercel Environment Variables:
-    - Must be exposed to browser
-    - No trailing slashes
-    - Should match: https://[id].supabase.co
-  `)
+const validateSupabaseConfig = (url: string, key: string) => {
+  if (!url.startsWith('https://')) throw new Error('Invalid Supabase URL format')
+  if (!key.startsWith('eyJhbGciOiJ')) throw new Error('Invalid Supabase key format')
 }
 
-if (!supabaseKey || supabaseKey === 'undefined') {
-  throw new Error(`
-    Missing NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    Check Vercel Environment Variables:
-    - Must be exposed to browser
-    - Should start with eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
-  `)
-}
+export const supabase = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  
+  if (!url || !key) {
+    throw new Error('Missing Supabase configuration - check .env files')
+  }
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseKey)
+  try {
+    validateSupabaseConfig(url, key)
+    return createBrowserClient(url, key)
+  } catch (error) {
+    console.error('Supabase initialization failed:', error)
+    throw error
+  }
+})()
