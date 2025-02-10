@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { BiometricAuth } from './BiometricAuth'
+import { startAuthentication } from '@simplewebauthn/browser';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -70,6 +71,24 @@ export default function LoginForm() {
     }
   }
 
+  const handleBiometricLogin = async () => {
+    try {
+      const authOptions = await fetch('/api/auth/webauthn-options');
+      const asseResp = await startAuthentication(await authOptions.json());
+      
+      const verification = await fetch('/api/auth/webauthn-verify', {
+        method: 'POST',
+        body: JSON.stringify(asseResp)
+      });
+
+      if (verification.ok) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error('Biometric login failed:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -129,7 +148,7 @@ export default function LoginForm() {
             </div>
           </div>
 
-          <BiometricAuth />
+          <BiometricAuth handleBiometricLogin={handleBiometricLogin} />
 
           <div>
             <button

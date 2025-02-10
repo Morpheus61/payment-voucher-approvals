@@ -15,7 +15,7 @@ export default function ClientLayout({
   const router = useRouter()
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       const currentToken = getCookie('sb-access-token')
       
       if (session?.access_token !== currentToken) {

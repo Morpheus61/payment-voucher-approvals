@@ -45,7 +45,7 @@ export function BiometricAuth() {
             id: window.location.hostname
           },
           user: {
-            id: Uint8Array.from(session.user.id, c => c.charCodeAt(0)),
+            id: Uint8Array.from(String(session.user.id), c => c.charCodeAt(0)),
             name: session.user.email!,
             displayName: session.user.email!
           },
