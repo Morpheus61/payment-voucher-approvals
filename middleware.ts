@@ -1,10 +1,10 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
-  
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -13,13 +13,20 @@ export async function middleware(req: NextRequest) {
         get(name: string) {
           return req.cookies.get(name)?.value
         },
-        set(name: string, value: string, options) {
-          res.cookies.set({ name, value, ...options })
+        set(name: string, value: string, options: CookieOptions) {
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          })
         },
-        remove(name: string, options) {
-          res.cookies.delete({ name, ...options })
-        }
-      }
+        remove(name: string, options: CookieOptions) {
+          res.cookies.delete({
+            name,
+            ...options,
+          })
+        },
+      },
     }
   )
 
@@ -31,7 +38,6 @@ export async function middleware(req: NextRequest) {
     return res
   }
 
-  // Check and refresh session
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -43,7 +49,6 @@ export async function middleware(req: NextRequest) {
   return res
 }
 
-// Update config to match all routes except public ones
 export const config = {
   matcher: [
     '/((?!api|_next/static|_next/image|favicon.ico).*)',

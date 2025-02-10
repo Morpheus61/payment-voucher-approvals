@@ -1,20 +1,26 @@
 // lib/supabaseClient.ts
 'use client'
 
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-console.log('Supabase URL:', supabaseUrl ? 'Loaded' : 'Missing')
-console.log('Supabase Anon Key:', supabaseAnonKey ? 'Loaded' : 'Missing')
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(`
-    Missing environment variables:
-    NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl ? '✓' : '✗'}
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: ${supabaseAnonKey ? '✓' : '✗'}
-  `)
+if (
+  !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+) {
+  throw new Error('Missing Supabase environment variables')
 }
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey)
+// Create a single supabase client for interacting with your database
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+)
+
+export { supabase }
