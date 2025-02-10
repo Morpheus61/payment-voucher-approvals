@@ -30,19 +30,30 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/');
-        return;
-      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push('/');
+          return;
+        }
 
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
 
-      if (error || !userData || !['admin', 'super_admin'].includes(userData.role)) {
+        if (error) {
+          console.error('Error fetching user role:', error);
+          router.push('/');
+          return;
+        }
+
+        if (!userData || !['admin', 'super_admin'].includes(userData.role)) {
+          router.push('/');
+        }
+      } catch (err) {
+        console.error('Error checking admin status:', err);
         router.push('/');
       }
     };
@@ -51,37 +62,62 @@ const AdminDashboard = () => {
   }, [router]);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch users
+        // Check if users table exists and fetch users
         const { data: usersData, error: usersError } = await supabase
           .from('users')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (usersError) throw usersError;
-        setUsers(usersData || []);
+        if (usersError) {
+          console.error('Error fetching users:', usersError);
+          if (isMounted) {
+            setError('Error fetching users. Please try again later.');
+          }
+          return;
+        }
 
-        // Fetch vouchers
+        if (isMounted) {
+          setUsers(usersData || []);
+        }
+
+        // Check if payment_vouchers table exists
         const { data: vouchersData, error: vouchersError } = await supabase
           .from('payment_vouchers')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (vouchersError) throw vouchersError;
-        setVouchers(vouchersData || []);
+        if (vouchersError) {
+          console.error('Error fetching vouchers:', vouchersError);
+          // Don't set error if only vouchers fail to load
+          setVouchers([]);
+        } else if (isMounted) {
+          setVouchers(vouchersData || []);
+        }
 
       } catch (err: any) {
-        setError(err.message);
+        console.error('Error in data fetching:', err);
+        if (isMounted) {
+          setError(err.message || 'An unexpected error occurred');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const deleteUser = async (userId: string) => {
@@ -98,7 +134,8 @@ const AdminDashboard = () => {
 
       setUsers(users.filter(user => user.id !== userId));
     } catch (err: any) {
-      setError(err.message);
+      console.error('Error deleting user:', err);
+      setError(err.message || 'Failed to delete user');
     }
   };
 
@@ -162,34 +199,42 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
-                      <tr key={user.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.full_name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.role === 'super_admin' 
-                              ? 'bg-purple-100 text-purple-800'
-                              : user.role === 'admin'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(user.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <button
-                            onClick={() => deleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                    {users.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                          No users found
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      users.map((user) => (
+                        <tr key={user.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.full_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              user.role === 'super_admin' 
+                                ? 'bg-purple-100 text-purple-800'
+                                : user.role === 'admin'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-green-100 text-green-800'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(user.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <button
+                              onClick={() => deleteUser(user.id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -205,26 +250,34 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {vouchers.map((voucher) => (
-                      <tr key={voucher.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{voucher.requester_email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{voucher.amount.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            voucher.status === 'approved' 
-                              ? 'bg-green-100 text-green-800'
-                              : voucher.status === 'rejected'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {voucher.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(voucher.created_at).toLocaleDateString()}
+                    {vouchers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                          No payment vouchers found
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      vouchers.map((voucher) => (
+                        <tr key={voucher.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{voucher.requester_email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{voucher.amount.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              voucher.status === 'approved' 
+                                ? 'bg-green-100 text-green-800'
+                                : voucher.status === 'rejected'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {voucher.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(voucher.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
