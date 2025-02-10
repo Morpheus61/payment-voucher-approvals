@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import BiometricAuth from './BiometricAuth'
 import { startAuthentication } from '@simplewebauthn/browser'
+import { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 export default function LoginForm(): JSX.Element {
   const [email, setEmail] = useState<string>('')
@@ -36,7 +37,7 @@ export default function LoginForm(): JSX.Element {
 
     const initAuth = async (): Promise<void> => {
       try {
-        const authStateChange = supabase.auth.onAuthStateChange((event, session) => {
+        const authStateChange = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
           if (session?.user) {
             router.push('/admin')
           }

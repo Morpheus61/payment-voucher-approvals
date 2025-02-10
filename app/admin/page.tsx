@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardLayout from '@/components/AdminDashboard';
+import dynamic from 'next/dynamic';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 interface User {
@@ -46,7 +46,16 @@ const UserTable: React.FC<{
   </div>
 );
 
-export default function AdminPage() {
+const AdminDashboard = dynamic(() => import('@/components/AdminDashboard'), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen flex items-center justify-center">
+      Loading dashboard...
+    </div>
+  ),
+});
+
+const DashboardContent = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const router = useRouter();
@@ -84,22 +93,28 @@ export default function AdminPage() {
   }, []);
 
   return (
-    <DashboardLayout>
-      <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
-        <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-          <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
-            <div className="max-w-md mx-auto">
-              <div className="divide-y divide-gray-200">
-                <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
-                  <h2 className="text-2xl font-bold mb-8">Admin Dashboard</h2>
-                  {loading && <p>Loading...</p>}
-                  <UserTable users={users} deleteUser={deleteUser} />
-                </div>
+    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
+      <div className="relative py-3 sm:max-w-xl sm:mx-auto">
+        <div className="relative px-4 py-10 bg-white shadow-lg sm:rounded-3xl sm:p-20">
+          <div className="max-w-md mx-auto">
+            <div className="divide-y divide-gray-200">
+              <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
+                <h2 className="text-2xl font-bold mb-8">Admin Dashboard</h2>
+                {loading && <p>Loading...</p>}
+                <UserTable users={users} deleteUser={deleteUser} />
               </div>
             </div>
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </div>
+  );
+};
+
+export default function AdminPage() {
+  return (
+    <AdminDashboard>
+      <DashboardContent />
+    </AdminDashboard>
   );
 }
