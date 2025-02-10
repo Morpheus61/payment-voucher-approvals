@@ -89,6 +89,13 @@ const nextConfig = {
   i18n: {
     locales: ['en'],
     defaultLocale: 'en',
+  },
+  webpack: (config) => {
+    config.resolve.fallback = { 
+      ...config.resolve.fallback,
+      punycode: require.resolve('punycode/')
+    }
+    return config
   }
 }
 

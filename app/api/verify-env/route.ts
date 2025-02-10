@@ -3,9 +3,8 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   return NextResponse.json({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 12) + '...',
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 12) + '...',
-    nodeEnv: process.env.NODE_ENV,
-    status: 'SUCCESS'
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 15) + '...',
+    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 15) + '...',
+    nodeEnv: process.env.NODE_ENV
   })
 }
