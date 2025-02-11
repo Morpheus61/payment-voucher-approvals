@@ -1,182 +1,92 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { useState } from 'react'
+import { startAuthentication } from '@simplewebauthn/browser'
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-hot-toast'
 
 interface BiometricAuthProps {
-  handleBiometricLogin: () => Promise<void>;
+  userId?: string
 }
 
-export default function BiometricAuth({ handleBiometricLogin }: BiometricAuthProps) {
-  const [biometricSupported, setBiometricSupported] = useState(false)
+export default function BiometricAuth({ userId }: BiometricAuthProps) {
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
-  useEffect(() => {
-    // Check if WebAuthn is supported
-    if (window.PublicKeyCredential) {
-      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-        .then((available) => {
-          setBiometricSupported(available)
-        })
+  const handleBiometricAuth = async () => {
+    if (!userId) {
+      toast.error('User ID is required for biometric authentication')
+      return
     }
-  }, [])
 
-  const handleRegisterBiometric = async () => {
+    setLoading(true)
     try {
-      setLoading(true);
-      
-      // Verify valid session exists
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (error || !session?.user) {
-        throw new Error('Please sign in with your credentials first');
-      }
+      // Get authentication options from server
+      const optionsRes = await fetch('/api/auth/webauthn')
+      const options = await optionsRes.json()
 
-      // Validate active session
-      if (!session) {
-        throw new Error('Please authenticate with your credentials first');
-      }
+      // Start the authentication process
+      const credential = await startAuthentication(options)
 
-      // Proceed with WebAuthn registration
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge)
-
-      // Create credential options
-      const createCredentialOptions: CredentialCreationOptions = {
-        publicKey: {
-          challenge,
-          rp: {
-            name: 'Payment Voucher Approvals',
-            id: window.location.hostname
-          },
-          user: {
-            id: Uint8Array.from(String(session.user.id), c => c.charCodeAt(0)),
-            name: session.user.email!,
-            displayName: session.user.email!
-          },
-          pubKeyCredParams: [
-            { type: 'public-key', alg: -7 }, // ES256
-            { type: 'public-key', alg: -257 } // RS256
-          ],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required'
-          },
-          timeout: 60000,
-          attestation: 'none'
-        }
-      }
-
-      // Create credential
-      const credential = await navigator.credentials.create(createCredentialOptions)
-      if (!credential) throw new Error('Failed to create credential')
-
-      // Store credential ID in Supabase
-      const { error: dbError } = await supabase
-        .from('user_credentials')
-        .insert({
-          user_id: session.user.id,
-          credential_id: btoa(Array.from(new Uint8Array((credential as PublicKeyCredential).rawId), c => String.fromCharCode(c)).join('')),
-          public_key: JSON.stringify(credential),
-          created_at: new Date().toISOString()
-        })
-
-      if (dbError) throw dbError
-
-      alert('Biometric authentication registered successfully!')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const loginWithBiometric = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Get stored credential
-      const { data: credentials, error: fetchError } = await supabase
-        .from('user_credentials')
-        .select('credential_id, public_key')
-        .single()
-
-      if (fetchError) throw fetchError
-      if (!credentials) throw new Error('No registered biometric found')
-
-      // Generate random challenge
-      const challenge = new Uint8Array(32)
-      crypto.getRandomValues(challenge)
-
-      // Create assertion options
-      const assertionOptions: CredentialRequestOptions = {
-        publicKey: {
-          challenge,
-          allowCredentials: [{
-            id: Uint8Array.from(atob(credentials.credential_id), c => c.charCodeAt(0)),
-            type: 'public-key'
-          }],
-          userVerification: 'required',
-          timeout: 60000
-        }
-      }
-
-      // Get assertion
-      const assertion = await navigator.credentials.get(assertionOptions)
-      if (!assertion) throw new Error('Failed to get assertion')
-
-      // Verify assertion on server (you'll need to implement this)
-      const response = await fetch('/api/verify-biometric', {
+      // Send the credential to server for verification
+      const verificationRes = await fetch('/api/auth/webauthn', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          assertion,
-          credentialId: credentials.credential_id
-        })
+          credential,
+          userId,
+        }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message)
+      const verification = await verificationRes.json()
+
+      if (verification.error) {
+        throw new Error(verification.error)
       }
 
-      // Refresh the session
-      await supabase.auth.refreshSession()
-      
-      alert('Logged in successfully with biometric!')
-    } catch (err) {
-      console.error('Error logging in with biometric:', err)
-      setError(err instanceof Error ? err.message : 'Failed to login with biometric')
+      if (verification.success) {
+        toast.success('Authentication successful')
+        router.push('/admin')
+      } else {
+        throw new Error('Authentication failed')
+      }
+    } catch (error) {
+      console.error('Biometric authentication error:', error)
+      toast.error('Biometric authentication failed')
     } finally {
       setLoading(false)
     }
   }
 
-  if (!biometricSupported) {
-    return null
-  }
-
   return (
-    <div className="mt-4">
-      <button
-        onClick={handleRegisterBiometric}
-        disabled={loading}
-        className="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 mb-2"
-      >
-        {loading ? 'Processing...' : 'Register Biometric Login'}
-      </button>
-      
-      <button
-        onClick={loginWithBiometric}
-        disabled={loading}
-        className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-      >
-        {loading ? 'Processing...' : 'Login with Biometric'}
-      </button>
-
-      {error && (
-        <p className="mt-2 text-sm text-red-500">{error}</p>
+    <button
+      onClick={handleBiometricAuth}
+      disabled={loading}
+      className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+    >
+      {loading ? (
+        <div className="flex items-center">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+          Authenticating...
+        </div>
+      ) : (
+        <>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 mr-2"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Use Biometric Login
+        </>
       )}
-    </div>
+    </button>
   )
 }

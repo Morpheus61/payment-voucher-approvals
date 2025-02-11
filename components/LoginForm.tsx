@@ -5,73 +5,42 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import BiometricAuth from './BiometricAuth'
-import { startAuthentication } from '@simplewebauthn/browser'
-import { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { toast } from 'react-hot-toast'
 
 export default function LoginForm(): JSX.Element {
   const [email, setEmail] = useState<string>('')
   const [password, setPassword] = useState<string>('')
   const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string | null>(null)
+  const [biometricSupported, setBiometricSupported] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const router = useRouter()
 
-  const checkSession = useCallback(async (): Promise<void> => {
-    try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError) {
-        throw new Error(`Session error: ${sessionError.message}`)
-      }
-
-      if (session?.user) {
-        router.push('/admin')
-      }
-    } catch (error) {
-      console.error('Session check failed:', error)
-      setError('Failed to check session - please refresh the page')
-    }
-  }, [router])
-
   useEffect(() => {
-    let subscription: any
-
-    const initAuth = async (): Promise<void> => {
-      try {
-        const authStateChange = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-          if (session?.user) {
-            router.push('/admin')
-          }
+    // Check if WebAuthn is supported
+    if (window.PublicKeyCredential) {
+      PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+        .then((available) => {
+          setBiometricSupported(available)
         })
-
-        subscription = authStateChange.data.subscription
-        await checkSession()
-      } catch (error) {
-        console.error('Auth initialization error:', error)
-        setError('Authentication system initialization failed')
-      }
     }
 
-    initAuth()
-
-    return () => {
-      if (subscription) {
-        subscription.unsubscribe()
+    // Check for existing session
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUserId(session.user.id)
       }
     }
-  }, [router, checkSession])
+    checkSession()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     if (loading) return
 
     setLoading(true)
-    setError(null)
 
     try {
-      if (!supabase) {
-        throw new Error('Authentication client not available')
-      }
-
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
@@ -85,41 +54,14 @@ export default function LoginForm(): JSX.Element {
         throw new Error('Authentication failed: No user data received')
       }
 
+      setUserId(data.user.id)
+      toast.success('Login successful')
       router.push('/admin')
     } catch (err) {
       console.error('Login error:', err)
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+      toast.error(err instanceof Error ? err.message : 'Authentication failed')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleBiometricLogin = async (): Promise<void> => {
-    try {
-      const authOptionsResponse = await fetch('/api/auth/webauthn-options')
-      if (!authOptionsResponse.ok) {
-        throw new Error('Failed to get authentication options')
-      }
-
-      const authOptions = await authOptionsResponse.json()
-      const asseResp = await startAuthentication(authOptions)
-
-      const verificationResponse = await fetch('/api/auth/webauthn-verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(asseResp),
-      })
-
-      if (!verificationResponse.ok) {
-        throw new Error('Biometric verification failed')
-      }
-
-      router.refresh()
-    } catch (error) {
-      console.error('Biometric login failed:', error)
-      setError('Biometric authentication failed. Please try again.')
     }
   }
 
@@ -140,14 +82,12 @@ export default function LoginForm(): JSX.Element {
             Sign in to your account
           </p>
         </div>
-        
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
+          {loading && (
             <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+              <div className="text-sm text-red-700">Signing in...</div>
             </div>
           )}
-
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
@@ -161,12 +101,10 @@ export default function LoginForm(): JSX.Element {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder="Email address"
-                disabled={loading}
               />
             </div>
-
             <div>
               <label htmlFor="password" className="sr-only">
                 Password
@@ -179,35 +117,46 @@ export default function LoginForm(): JSX.Element {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
-                disabled={loading}
               />
             </div>
           </div>
-
-          <BiometricAuth handleBiometricLogin={handleBiometricLogin} />
 
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               {loading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Signing in...
-                </span>
+                </div>
               ) : (
                 'Sign in'
               )}
             </button>
           </div>
         </form>
+
+        {biometricSupported && (
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <BiometricAuth userId={userId || undefined} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
