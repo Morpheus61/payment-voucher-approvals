@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key",
+    "RESEND_API_KEY": "@resend_api_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "RP_ID": "@rp_id",
+    "VAPID_PRIVATE_KEY": "@vapid_private_key",
+    "NEXT_PUBLIC_VAPID_PUBLIC_KEY": "@next_public_vapid_public_key",
+    "NEXT_PUBLIC_BASE_URL": "@next_public_base_url",
+    "NEXT_PUBLIC_APP_URL": "@next_public_app_url",
+    "NEXTAUTH_SECRET": "@nextauth_secret"
+  }
+}
